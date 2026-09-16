@@ -1,0 +1,2025 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Golf Live · Marcador en tiempo real</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --verde-negro:#081a13;
+  --verde-oscuro:#0d3a26;
+  --verde-campo:#155c39;
+  --verde-fairway:#1f7a4d;
+  --verde-claro:#3fa66b;
+  --dorado:#c9a24b;
+  --dorado-claro:#e3c876;
+  --crema:#f3efe2;
+  --blanco:#ffffff;
+  --rojo:#c0392b;
+  --rojo-oscuro:#9b2c20;
+  --gris-linea:rgba(255,255,255,.12);
+  --sombra:0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Inter',sans-serif;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(63,166,107,.20), transparent 60%),
+    radial-gradient(1000px 500px at 100% 0%, rgba(201,162,75,.12), transparent 55%),
+    linear-gradient(180deg,var(--verde-negro),var(--verde-oscuro) 45%,#0a2c1c 100%);
+  color:var(--crema);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.hidden{display:none !important;}
+#app{max-width:1180px;margin:0 auto;padding:22px 18px 60px;}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:22px;}
+.brand .ball{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #fff, #d8d8d8 60%, #aaa 100%);box-shadow:0 0 0 3px rgba(255,255,255,.06);}
+.brand h1{font-family:'Bebas Neue',sans-serif;letter-spacing:1.5px;font-size:26px;margin:0;color:var(--crema);}
+.brand span{color:var(--dorado-claro);}
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  border:1px solid var(--gris-linea);
+  border-radius:18px;
+  padding:26px;
+  box-shadow:var(--sombra);
+  backdrop-filter:blur(6px);
+}
+.center-wrap{display:flex;align-items:center;justify-content:center;min-height:72vh;}
+.stack{display:flex;flex-direction:column;gap:16px;}
+h2.title{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:1px;margin:0 0 4px;color:var(--crema);}
+p.sub{color:rgba(243,239,226,.65);margin:0 0 18px;font-size:14.5px;line-height:1.5;}
+label{font-size:13px;color:rgba(243,239,226,.7);font-weight:600;display:block;margin-bottom:6px;}
+input[type=text], input[type=number]{
+  width:100%;background:rgba(0,0,0,.28);border:1px solid var(--gris-linea);
+  color:var(--crema);padding:13px 14px;border-radius:12px;font-size:16px;font-family:'Inter';
+  outline:none;transition:border-color .15s;
+}
+input[type=text]:focus,input[type=number]:focus{border-color:var(--dorado);}
+input.code-input{text-align:center;letter-spacing:10px;font-size:26px;font-family:'Bebas Neue';font-weight:400;}
+.btn{
+  border:none;border-radius:12px;padding:14px 20px;font-size:15px;font-weight:700;
+  cursor:pointer;transition:transform .1s ease, filter .15s ease;font-family:'Inter';
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn:active{transform:scale(.98);}
+.btn-primary{background:linear-gradient(180deg,var(--verde-claro),var(--verde-fairway));color:#06170f;}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn-gold{background:linear-gradient(180deg,var(--dorado-claro),var(--dorado));color:#3a2c05;}
+.btn-gold:hover{filter:brightness(1.06);}
+.btn-outline{background:transparent;border:1.5px solid var(--gris-linea);color:var(--crema);}
+.btn-outline:hover{border-color:var(--dorado);}
+.btn-red{background:linear-gradient(180deg,#e0574a,var(--rojo));color:#fff;}
+.btn-red:hover{filter:brightness(1.08);}
+.btn-block{width:100%;}
+.btn-lg{padding:18px 22px;font-size:17px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.row{display:flex;gap:12px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.error-msg{color:#ff8a80;font-size:13.5px;margin-top:8px;min-height:16px;}
+.link-btn{background:none;border:none;color:rgba(243,239,226,.6);text-decoration:underline;cursor:pointer;font-size:13.5px;font-family:'Inter';}
+
+/* Course grid */
+.course-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
+.course-card{
+  position:relative;border-radius:14px;overflow:hidden;cursor:pointer;border:2px solid transparent;
+  aspect-ratio:4/5;background:#0a2416;
+}
+.course-card img{width:100%;height:100%;object-fit:cover;display:block;opacity:.75;transition:opacity .15s, transform .3s;}
+.course-card:hover img{opacity:.9;transform:scale(1.04);}
+.course-card.selected{border-color:var(--dorado);}
+.course-card .overlay{position:absolute;inset:0;background:linear-gradient(180deg, rgba(8,26,19,.05) 40%, rgba(8,26,19,.92) 100%);}
+.course-card .name{position:absolute;left:10px;right:10px;bottom:10px;font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;color:#fff;line-height:1.05;}
+.course-card.otro{display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,var(--verde-campo),var(--verde-oscuro));}
+.course-card.otro .plus{font-size:34px;color:var(--dorado-claro);}
+.course-card .check{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:var(--dorado);color:#3a2c05;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;}
+
+/* Stepper */
+.steps{display:flex;gap:6px;margin-bottom:20px;}
+.steps .dot{flex:1;height:4px;border-radius:3px;background:var(--gris-linea);}
+.steps .dot.done{background:var(--verde-claro);}
+.steps .dot.active{background:var(--dorado);}
+
+/* Handicap table editor */
+.hcp-table{width:100%;border-collapse:collapse;margin-top:10px;}
+.hcp-table th{text-align:left;font-size:12px;color:rgba(243,239,226,.55);padding:6px 8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.hcp-table td{padding:5px 6px;}
+.hcp-table input{padding:9px 8px;font-size:14px;}
+.hcp-table tr td:last-child{width:36px;}
+.mini-x{background:rgba(255,255,255,.06);border:none;color:#ff8a80;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:16px;}
+.method-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0 6px;}
+.method-card{border:1.5px solid var(--gris-linea);border-radius:14px;padding:16px;text-align:center;cursor:pointer;}
+.method-card:hover{border-color:var(--dorado);}
+.method-card .ic{font-size:26px;margin-bottom:6px;}
+.photo-preview{width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin:10px 0;border:1px solid var(--gris-linea);}
+
+/* Avatar picker */
+.avatar-row{display:flex;align-items:center;gap:16px;}
+.avatar-circle{
+  width:72px;height:72px;border-radius:50%;background:linear-gradient(160deg,var(--verde-fairway),var(--verde-campo));
+  display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue';font-size:24px;color:var(--crema);
+  overflow:hidden;border:2px solid var(--dorado);flex-shrink:0;
+}
+.avatar-circle img{width:100%;height:100%;object-fit:cover;}
+.avatar-opts{display:flex;gap:8px;flex-wrap:wrap;}
+.avatar-opts .btn{padding:9px 12px;font-size:13px;}
+
+/* Join preview */
+.match-preview{border-radius:14px;overflow:hidden;position:relative;margin-bottom:16px;height:130px;}
+.match-preview img{width:100%;height:100%;object-fit:cover;filter:brightness(.55);}
+.match-preview .info{position:absolute;inset:0;padding:14px 16px;display:flex;flex-direction:column;justify-content:flex-end;}
+.match-preview .info h3{margin:0;font-family:'Bebas Neue';font-size:22px;letter-spacing:.5px;}
+.match-preview .info span{font-size:12.5px;color:rgba(243,239,226,.8);}
+.meta-chip{display:inline-flex;gap:6px;background:rgba(0,0,0,.32);border-radius:8px;padding:4px 9px;font-size:12px;margin-right:6px;margin-top:6px;}
+
+/* Score / play screen */
+.play-grid{display:grid;grid-template-columns:2fr 3fr;gap:16px;align-items:start;}
+@media (max-width:820px){.play-grid{grid-template-columns:1fr;}}
+.rank-panel{border-radius:16px;padding:16px;}
+.rank-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.rank-header h3{font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0;}
+.refresh-btn{background:rgba(255,255,255,.07);border:1px solid var(--gris-linea);color:var(--crema);border-radius:9px;padding:7px 10px;font-size:12px;cursor:pointer;display:flex;gap:5px;align-items:center;}
+.refresh-btn:hover{border-color:var(--dorado);}
+.player-row{
+  display:grid;grid-template-columns:26px 40px 1fr auto auto;align-items:center;gap:10px;
+  padding:10px 8px;border-bottom:1px solid var(--gris-linea);
+}
+.player-row:last-child{border-bottom:none;}
+.pos-num{font-family:'Bebas Neue';font-size:18px;color:var(--dorado-claro);text-align:center;}
+.mini-avatar{width:40px;height:40px;border-radius:50%;overflow:hidden;background:linear-gradient(160deg,var(--verde-fairway),var(--verde-campo));display:flex;align-items:center;justify-content:center;font-size:14px;font-family:'Bebas Neue';border:1.5px solid rgba(255,255,255,.25);}
+.mini-avatar img{width:100%;height:100%;object-fit:cover;}
+.p-name{font-weight:700;font-size:14.5px;}
+.p-sub{font-size:11.5px;color:rgba(243,239,226,.55);}
+.p-total{font-family:'Bebas Neue';font-size:19px;text-align:right;}
+.p-diff{font-family:'Bebas Neue';font-size:19px;text-align:right;min-width:44px;}
+.diff-pos{color:#ff8a80;}
+.diff-neg{color:#7fe3a3;}
+.diff-zero{color:var(--dorado-claro);}
+.you-row{background:rgba(201,162,75,.08);border-radius:10px;}
+
+.score-panel{border-radius:16px;padding:22px;text-align:center;}
+.hole-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.nav-arrow{background:rgba(255,255,255,.07);border:1px solid var(--gris-linea);color:var(--crema);width:42px;height:42px;border-radius:50%;font-size:18px;cursor:pointer;}
+.nav-arrow:disabled{opacity:.25;cursor:not-allowed;}
+.hole-badge{font-family:'Bebas Neue';font-size:15px;color:rgba(243,239,226,.65);letter-spacing:1px;}
+.hole-number{font-family:'Bebas Neue';font-size:108px;line-height:1;color:var(--crema);margin:2px 0 2px;}
+.hole-par{color:var(--dorado-claro);font-size:16px;margin-bottom:18px;font-weight:700;}
+.strokes-input-wrap{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:20px;}
+.stepper-btn{width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--gris-linea);color:var(--crema);font-size:32px;cursor:pointer;}
+.strokes-display{font-family:'Bebas Neue';font-size:96px;width:150px;text-align:center;background:transparent;border:none;color:var(--crema);}
+.registered-tag{font-size:12px;color:#7fe3a3;margin-bottom:10px;min-height:16px;}
+.close-master{margin-top:18px;padding-top:16px;border-top:1px dashed var(--gris-linea);}
+
+/* scorecard mini strip */
+.holes-strip{display:flex;gap:4px;overflow-x:auto;margin-top:16px;padding-bottom:4px;}
+.hs-cell{min-width:30px;text-align:center;padding:6px 2px;border-radius:7px;font-size:11px;background:rgba(255,255,255,.04);cursor:pointer;border:1px solid transparent;}
+.hs-cell.filled{background:rgba(63,166,107,.18);color:#bfe9cf;}
+.hs-cell.current{border-color:var(--dorado);}
+.hs-cell .n{display:block;font-size:9.5px;color:rgba(243,239,226,.45);}
+
+/* results screen */
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:14px;margin:26px 0 18px;}
+.pod-slot{text-align:center;}
+.pod-slot .mini-avatar{width:56px;height:56px;margin:0 auto 8px;}
+.pod-slot .bar{border-radius:10px 10px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;font-family:'Bebas Neue';font-size:26px;}
+.pod-1 .bar{height:100px;background:linear-gradient(180deg,var(--dorado-claro),var(--dorado));color:#3a2c05;}
+.pod-2 .bar{height:74px;background:linear-gradient(180deg,#cfd8d6,#9aa6a4);color:#1a1f1e;}
+.pod-3 .bar{height:56px;background:linear-gradient(180deg,#d7a373,#a9683b);color:#2a1607;}
+.pod-slot .pname{font-size:13px;font-weight:700;margin-top:6px;}
+.pod-slot .presult{font-size:11.5px;color:rgba(243,239,226,.6);}
+
+table.results-table{width:100%;border-collapse:collapse;font-size:13px;}
+table.results-table th{text-align:left;color:rgba(243,239,226,.55);font-weight:600;padding:8px 6px;border-bottom:1px solid var(--gris-linea);font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;}
+table.results-table td{padding:9px 6px;border-bottom:1px solid var(--gris-linea);}
+.tabs{display:flex;gap:8px;margin:22px 0 14px;flex-wrap:wrap;}
+.tab-btn{background:rgba(255,255,255,.05);border:1px solid var(--gris-linea);color:var(--crema);padding:9px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;}
+.tab-btn.active{background:var(--dorado);color:#3a2c05;border-color:var(--dorado);}
+.section-title{font-family:'Bebas Neue';font-size:20px;letter-spacing:.5px;margin:22px 0 10px;color:var(--dorado-claro);}
+.insight-card{background:rgba(255,255,255,.04);border-left:3px solid var(--dorado);border-radius:8px;padding:12px 14px;margin-bottom:10px;font-size:13.5px;line-height:1.5;}
+.insight-card b{color:var(--dorado-claro);}
+.chart-wrap{background:rgba(0,0,0,.18);border-radius:14px;padding:16px;margin-top:8px;}
+.player-select{margin-bottom:12px;}
+select{width:100%;background:rgba(0,0,0,.28);border:1px solid var(--gris-linea);color:var(--crema);padding:12px 14px;border-radius:12px;font-size:15px;font-family:'Inter';}
+.close-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
+.close-modal{max-width:480px;width:100%;}
+.warn-row{display:flex;justify-content:space-between;padding:7px 0;font-size:13.5px;border-bottom:1px solid var(--gris-linea);}
+.pill{font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(255,138,128,.18);color:#ff8a80;}
+.pill.ok{background:rgba(127,227,163,.18);color:#7fe3a3;}
+footer.hint{text-align:center;font-size:12px;color:rgba(243,239,226,.35);margin-top:30px;}
+.demo-note{font-size:11.5px;color:rgba(243,239,226,.45);text-align:center;margin-top:14px;line-height:1.5;}
+
+/* credito */
+.credit-tag{position:fixed;right:10px;bottom:8px;font-size:10.5px;color:rgba(243,239,226,.3);z-index:5;pointer-events:none;}
+
+/* recorrido / tee-genero picker */
+.route-grid{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+.route-btn{border:1.5px solid var(--gris-linea);border-radius:14px;padding:16px;text-align:left;cursor:pointer;background:rgba(255,255,255,.03);color:var(--crema);font-family:'Inter';font-size:15px;font-weight:700;}
+.route-btn:hover{border-color:var(--dorado);}
+.route-btn .rsub{display:block;font-size:12px;font-weight:400;color:rgba(243,239,226,.55);margin-top:3px;}
+.pill-group{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
+.pill-choice{border:1.5px solid var(--gris-linea);border-radius:20px;padding:8px 16px;font-size:13.5px;font-weight:600;background:transparent;color:var(--crema);cursor:pointer;font-family:'Inter';}
+.pill-choice.sel{background:var(--dorado);border-color:var(--dorado);color:#3a2c05;}
+.hoyos-ok{font-size:13px;color:#7fe3a3;background:rgba(127,227,163,.08);border-radius:10px;padding:10px 12px;}
+
+/* scorecard grid hoyo x jugador */
+.scorecard-wrap{overflow-x:auto;margin-top:10px;}
+table.scorecard-grid{border-collapse:collapse;font-size:12px;white-space:nowrap;}
+table.scorecard-grid th, table.scorecard-grid td{padding:6px 8px;text-align:center;border-bottom:1px solid var(--gris-linea);}
+table.scorecard-grid th{color:rgba(243,239,226,.55);font-weight:600;font-size:10.5px;text-transform:uppercase;}
+table.scorecard-grid td.pname-cell{text-align:left;font-weight:700;position:sticky;left:0;background:#0c2317;}
+table.scorecard-grid td.over{color:#ff8a80;}
+table.scorecard-grid td.under{color:#7fe3a3;}
+table.scorecard-grid td.par-row{color:rgba(243,239,226,.45);font-size:10.5px;}
+
+/* comparativa */
+.compare-list{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.compare-check{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.03);cursor:pointer;}
+.compare-check input{width:18px;height:18px;}
+.compare-check .p-name{flex:1;}
+
+/* informe / whatsapp */
+.results-actions{display:flex;gap:8px;flex-wrap:wrap;}
+textarea.comments{width:100%;background:rgba(0,0,0,.28);border:1px solid var(--gris-linea);color:var(--crema);padding:12px 14px;border-radius:12px;font-size:14px;font-family:'Inter';min-height:80px;resize:vertical;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="credit-tag">Creado por: sitobp@hotmail.com</div>
+
+<script>
+/* =========================================================
+   GOLF LIVE — prueba funcional sin Airtable (persistencia local)
+   Arquitectura preparada para sustituir el "Store" por llamadas
+   reales a la API de Airtable (ver objeto Store al final).
+   ========================================================= */
+
+const HOLE_COUNT_DEFAULT = 18;
+const PAR_DEFAULT = 72;
+
+/* El listado de campos ya NO está hardcodeado: se carga de la tabla Campos de
+   Airtable (ver camposCache más abajo). Solo queda la tarjeta especial "Otro campo",
+   gestionada directamente dentro de ScreenCrearCampo. */
+
+const DEFAULT_HCP_RANGES = [
+  {min:0, max:4.9, hcp:4},
+  {min:5, max:9.9, hcp:7},
+  {min:10, max:14.9, hcp:10},
+  {min:15, max:19.9, hcp:13},
+  {min:20, max:24.9, hcp:16},
+  {min:25, max:29.9, hcp:19},
+  {min:30, max:36, hcp:22},
+];
+
+/* ---------------- almacén seguro: localStorage con respaldo en memoria ----------------
+   Si el navegador bloquea localStorage (p.ej. al abrir el HTML con doble clic, protocolo
+   file://, o modo incógnito), la app sigue funcionando dentro de la misma pestaña en lugar
+   de romperse en blanco. Sirve como caché local instantánea; la persistencia real y la
+   sincronización entre jugadores/dispositivos las da Airtable (ver bloque AIRTABLE más abajo). */
+const memoryFallback = {};
+let LS_OK = true;
+try { localStorage.setItem('__lstest__','1'); localStorage.removeItem('__lstest__'); }
+catch(e){ LS_OK = false; }
+const safeStorage = {
+  getItem(k){ if (LS_OK){ try { return localStorage.getItem(k); } catch(e){ /* cae a memoria */ } } return (k in memoryFallback) ? memoryFallback[k] : null; },
+  setItem(k,v){ if (LS_OK){ try { localStorage.setItem(k,v); return; } catch(e){ /* cae a memoria */ } } memoryFallback[k]=v; },
+};
+
+/* ---------------- STORE (localStorage hoy, Airtable mañana) ---------------- */
+const Store = {
+  getCourseData(courseId){
+    const all = JSON.parse(safeStorage.getItem('golf_courses_v1') || '{}');
+    return all[courseId] || null;
+  },
+  saveCourseData(courseId, data){
+    const all = JSON.parse(safeStorage.getItem('golf_courses_v1') || '{}');
+    all[courseId] = data; // sobrescribe el último hándicap del campo
+    safeStorage.setItem('golf_courses_v1', JSON.stringify(all));
+  },
+  getMatch(code){
+    const raw = safeStorage.getItem('golf_match_'+code);
+    return raw ? JSON.parse(raw) : null;
+  },
+  saveMatch(match){
+    safeStorage.setItem('golf_match_'+match.code, JSON.stringify(match));
+    // fuerza evento en la misma pestaña (storage no dispara en el propio tab)
+    window.dispatchEvent(new CustomEvent('golf-local-update', {detail:match.code}));
+  },
+  matchExists(code){ return !!safeStorage.getItem('golf_match_'+code); },
+  newCode(){
+    let code;
+    do { code = String(Math.floor(1000 + Math.random()*9000)); } while (Store.matchExists(code));
+    return code;
+  }
+};
+
+/* =========================================================
+   AIRTABLE — persistencia real y sincronización entre jugadores/dispositivos.
+   El Store de arriba sigue siendo la caché local instantánea (para que la UI
+   nunca espere a la red); estas funciones empujan/traen los datos de Airtable
+   por debajo. NOTA: el token vive en el HTML porque es una app estática sin
+   backend — cualquiera que abra el código fuente puede verlo. Para este uso
+   familiar el riesgo es bajo, pero el token solo tiene acceso a esta base.
+   ========================================================= */
+/* El token de Airtable YA NO vive aquí: lo guarda Vercel como variable de entorno
+   (AIRTABLE_TOKEN) y solo lo usa la función serverless /api/airtable.js. Este
+   archivo, que descarga cualquiera que visite la web, nunca lo ve. */
+const AIRTABLE_BASE = 'appXjKghvDkcgord0';
+const T = {
+  campos: 'tblPn2sJEm6pruvRt',
+  tramos: 'tblzDLADzPjCb1Gmy',
+  partidas: 'tblf06k42rIYScVZx',
+  jugadores: 'tblryDz0OFYL1ykHm',
+  golpes: 'tblb2sljFgIzGCrja',
+  hoyos: 'tblAHe5ltT3AKJtOS',
+  tees: 'tblAiuNeoJicQ0dva'
+};
+const AVATAR_FIELD_ID = 'fld9P3CPLRRexrRCs';
+
+async function atRequest(method, table, path, body, _retry){
+  const airtablePath = `/v0/${AIRTABLE_BASE}/${table}${path||''}`;
+  const url = `/api/airtable?host=api&path=${encodeURIComponent(airtablePath)}`;
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (res.status === 429 && !_retry){
+    const wait = (parseFloat(res.headers.get('Retry-After')||'1'))*1000;
+    await new Promise(r=>setTimeout(r, wait));
+    return atRequest(method, table, path, body, true);
+  }
+  if (!res.ok){
+    const errText = await res.text().catch(()=> '');
+    throw new Error(`Airtable ${method} ${table} ${res.status}: ${errText}`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+async function atList(table, filterByFormula){
+  let all = [], offset;
+  do {
+    const qs = new URLSearchParams();
+    if (filterByFormula) qs.set('filterByFormula', filterByFormula);
+    qs.set('pageSize','100');
+    if (offset) qs.set('offset', offset);
+    const data = await atRequest('GET', table, `?${qs.toString()}`);
+    all = all.concat(data.records);
+    offset = data.offset;
+  } while(offset);
+  return all;
+}
+async function atCreate(table, fields){
+  const data = await atRequest('POST', table, '', { records:[{fields}] });
+  return data.records[0];
+}
+async function atCreateMany(table, fieldsArr){
+  let out = [];
+  for (let i=0;i<fieldsArr.length;i+=10){
+    const chunk = fieldsArr.slice(i,i+10).map(f=>({fields:f}));
+    const data = await atRequest('POST', table, '', { records: chunk });
+    out = out.concat(data.records);
+  }
+  return out;
+}
+async function atUpdate(table, recordId, fields){
+  return atRequest('PATCH', table, `/${recordId}`, { fields });
+}
+async function atDeleteMany(table, ids){
+  for (let i=0;i<ids.length;i+=10){
+    const qs = ids.slice(i,i+10).map(id=>`records[]=${id}`).join('&');
+    await atRequest('DELETE', table, `?${qs}`);
+  }
+}
+async function atUploadAttachment(recordId, fieldId, dataUrl, filename){
+  const m = /^data:(.+?);base64,(.+)$/.exec(dataUrl||'');
+  if (!m) return null;
+  const [, contentType, base64] = m;
+  const airtablePath = `/v0/${AIRTABLE_BASE}/${recordId}/${fieldId}/uploadAttachment`;
+  const url = `/api/airtable?host=content&path=${encodeURIComponent(airtablePath)}`;
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body: JSON.stringify({ contentType, file: base64, filename: filename||'avatar.jpg' })
+  });
+  if (!res.ok) throw new Error('Error subiendo avatar: '+res.status);
+  return res.json();
+}
+
+/* caché de la tabla Campos (se carga una vez) */
+const camposCache = { byCourseId:{}, byRecordId:{}, grupos:[], ready:false, _promise:null };
+function ensureCamposCache(){
+  if (camposCache.ready) return Promise.resolve(camposCache);
+  if (camposCache._promise) return camposCache._promise;
+  camposCache._promise = atList(T.campos).then(recs=>{
+    const gruposMap = {};
+    recs.forEach(r=>{
+      const entry = {
+        id:r.id, courseId:r.fields.CourseId, nombre:r.fields.Nombre, imagen:r.fields.ImagenURL,
+        clubBase: r.fields.ClubBase || r.fields.Nombre, recorrido: r.fields.NombreRecorrido || ''
+      };
+      camposCache.byCourseId[entry.courseId] = entry;
+      camposCache.byRecordId[entry.id] = entry;
+      if (!gruposMap[entry.clubBase]) gruposMap[entry.clubBase] = { label:entry.clubBase, imagen:entry.imagen, entries:[] };
+      gruposMap[entry.clubBase].entries.push(entry);
+    });
+    camposCache.grupos = Object.values(gruposMap);
+    camposCache.ready = true;
+    return camposCache;
+  }).catch(err=>{ console.error('No se pudo cargar Campos de Airtable:', err); camposCache._promise=null; throw err; });
+  return camposCache._promise;
+}
+ensureCamposCache().catch(()=>{}); // precarga en segundo plano al abrir la app
+
+/* caché de Hoyos: par + indice de handicap por hoyo, agrupado por campo (recordId) */
+const hoyosCache = { byCampo:{}, ready:false, _promise:null };
+function ensureHoyosCache(){
+  if (hoyosCache.ready) return Promise.resolve(hoyosCache);
+  if (hoyosCache._promise) return hoyosCache._promise;
+  hoyosCache._promise = atList(T.hoyos).then(recs=>{
+    recs.forEach(r=>{
+      const campoId = (r.fields.Campo && r.fields.Campo[0]) || null;
+      if (!campoId) return;
+      if (!hoyosCache.byCampo[campoId]) hoyosCache.byCampo[campoId] = [];
+      hoyosCache.byCampo[campoId].push({ numero:r.fields.NumeroHoyo, par:r.fields.Par, indice:r.fields.IndiceHandicap });
+    });
+    Object.values(hoyosCache.byCampo).forEach(arr=> arr.sort((a,b)=>a.numero-b.numero));
+    hoyosCache.ready = true;
+    return hoyosCache;
+  }).catch(err=>{ console.error('No se pudo cargar Hoyos de Airtable:', err); hoyosCache._promise=null; throw err; });
+  return hoyosCache._promise;
+}
+ensureHoyosCache().catch(()=>{});
+
+/* caché de TeesCampo: CR/SR por campo+tee+genero */
+const teesCache = { byCampo:{}, ready:false, _promise:null };
+function ensureTeesCache(){
+  if (teesCache.ready) return Promise.resolve(teesCache);
+  if (teesCache._promise) return teesCache._promise;
+  teesCache._promise = atList(T.tees).then(recs=>{
+    recs.forEach(r=>{
+      const campoId = (r.fields.Campo && r.fields.Campo[0]) || null;
+      if (!campoId) return;
+      if (!teesCache.byCampo[campoId]) teesCache.byCampo[campoId] = [];
+      teesCache.byCampo[campoId].push({ tee:r.fields.Tee, genero:r.fields.Genero, cr:r.fields.CR, sr:r.fields.SR, par:r.fields.Par });
+    });
+    teesCache.ready = true;
+    return teesCache;
+  }).catch(err=>{ console.error('No se pudo cargar TeesCampo de Airtable:', err); teesCache._promise=null; throw err; });
+  return teesCache._promise;
+}
+ensureTeesCache().catch(()=>{});
+
+/* caché de TramosHandicap: tabla granular oficial (min/max hcp persona -> hcp campo), por campo+tee+genero */
+const tramosCache = { byCampo:{}, ready:false, _promise:null };
+function ensureTramosCache(){
+  if (tramosCache.ready) return Promise.resolve(tramosCache);
+  if (tramosCache._promise) return tramosCache._promise;
+  tramosCache._promise = atList(T.tramos).then(recs=>{
+    recs.forEach(r=>{
+      const campoId = (r.fields.Campo && r.fields.Campo[0]) || null;
+      if (!campoId || !r.fields.Tee) return; // filas del flujo manual antiguo no tienen Tee: se ignoran aqui
+      if (!tramosCache.byCampo[campoId]) tramosCache.byCampo[campoId] = [];
+      tramosCache.byCampo[campoId].push({ tee:r.fields.Tee, genero:r.fields.Genero, min:r.fields.HcpDesde, max:r.fields.HcpHasta, hcpCampo:r.fields.HcpCampo });
+    });
+    tramosCache.ready = true;
+    return tramosCache;
+  }).catch(err=>{ console.error('No se pudo cargar TramosHandicap de Airtable:', err); tramosCache._promise=null; throw err; });
+  return tramosCache._promise;
+}
+ensureTramosCache().catch(()=>{});
+
+/* opciones de tee/genero disponibles para un campo (para el selector) */
+function availableTeeGenderOptions(campoRecordId){
+  const rows = [...(tramosCache.byCampo[campoRecordId]||[]), ...(teesCache.byCampo[campoRecordId]||[])];
+  const tees = [...new Set(rows.map(r=>r.tee).filter(Boolean))];
+  const generos = [...new Set(rows.map(r=>r.genero).filter(Boolean))];
+  return { tees, generos, hasData: tees.length>0 };
+}
+/* calcula el handicap de campo a partir de la tabla oficial (si existe) o por formula CR/SR (World Handicap System) */
+function computeHcpCampo(campoRecordId, tee, genero, hcpIndex){
+  const tramoRow = (tramosCache.byCampo[campoRecordId]||[]).find(r=> r.tee===tee && r.genero===genero && hcpIndex>=r.min && hcpIndex<=r.max);
+  if (tramoRow) return tramoRow.hcpCampo;
+  const teeRows = teesCache.byCampo[campoRecordId]||[];
+  const teeRow = teeRows.find(r=> r.tee===tee && r.genero===genero) || teeRows.find(r=> r.tee===tee);
+  if (teeRow) return Math.round(hcpIndex * (teeRow.sr/113) + (teeRow.cr - teeRow.par));
+  return null;
+}
+
+/* trae una partida completa (con jugadores y golpes) desde Airtable */
+async function fetchMatchFromAirtable(code){
+  await ensureCamposCache().catch(()=>{});
+  const partidas = await atList(T.partidas, `{Codigo}="${code}"`);
+  if (partidas.length === 0) return null;
+  const p = partidas[0];
+  const campoLink = (p.fields.Campo && p.fields.Campo[0]) || null;
+  const campo = campoLink ? camposCache.byRecordId[campoLink] : null;
+  const holesTotal = p.fields.Hoyos || HOLE_COUNT_DEFAULT;
+
+  // Los campos de enlace no se pueden filtrar de forma fiable con filterByFormula
+  // (dentro de una fórmula, un campo de enlace expone el campo primario del registro
+  // enlazado, no su recordId) así que se trae la tabla entera y se filtra en el cliente
+  // comparando IDs reales. Para el volumen de esta app (partidas familiares) es trivial.
+  const allJugadores = await atList(T.jugadores);
+  const jugadoresRecs = allJugadores.filter(j => (j.fields.Partida||[]).includes(p.id));
+  const allGolpes = await atList(T.golpes);
+  const players = jugadoresRecs.map((j)=>{
+    const golpesRecs = allGolpes.filter(g => (g.fields.Jugador||[]).includes(j.id));
+    const holes = new Array(holesTotal).fill(null);
+    const golpesIds = new Array(holesTotal).fill(null);
+    golpesRecs.forEach(g=>{
+      const h = g.fields.Hoyo;
+      if (h>=1 && h<=holesTotal){ holes[h-1] = g.fields.Golpes; golpesIds[h-1] = g.id; }
+    });
+    const avatarAtt = j.fields.Avatar && j.fields.Avatar[0];
+    return {
+      id: j.id, name: j.fields.Nombre, hcp: j.fields.Hcp, hcpCampo: j.fields.HcpCampo,
+      avatar: avatarAtt ? avatarAtt.url : null, isMaster: !!j.fields.EsMaster,
+      holes, currentHole: j.fields.HoyoActual || 0, _golpesIds: golpesIds
+    };
+  });
+
+  return {
+    _airtableId: p.id, _campoRecordId: campoLink,
+    code: p.fields.Codigo,
+    campoId: campo ? campo.courseId : '', campoNombre: campo ? campo.nombre : (p.fields.Campo?'Campo':''),
+    campoImagen: campo ? campo.imagen : null,
+    holes: holesTotal, par: p.fields.Par,
+    createdAt: p.fields.CreadaEn ? new Date(p.fields.CreadaEn).getTime() : Date.now(),
+    masterId: (players.find(pl=>pl.isMaster)||{}).id,
+    status: p.fields.Estado, closedAt: p.fields.CerradaEn ? new Date(p.fields.CerradaEn).getTime() : null,
+    comentarios: p.fields.Comentarios || '',
+    players
+  };
+}
+
+/* trae de Airtable y fusiona con la caché local, protegiendo mis propios datos
+   si acabo de escribir hace <4s (evita que un poll llegue antes que mi propio guardado) */
+let myDirtyUntil = 0;
+function markMineDirty(){ myDirtyUntil = Date.now() + 4000; }
+async function pullAndMerge(code){
+  const remote = await fetchMatchFromAirtable(code);
+  if (!remote) return null;
+  if (Date.now() < myDirtyUntil && CURRENT.playerId){
+    const local = Store.getMatch(code);
+    const localMe = local && local.players.find(p=>p.id===CURRENT.playerId);
+    const idx = remote.players.findIndex(p=>p.id===CURRENT.playerId);
+    if (localMe && idx>-1) remote.players[idx] = localMe;
+  }
+  Store.saveMatch(remote);
+  return remote;
+}
+
+/* funciones de escritura puntual usadas por la UI (crear/unirse ya llaman a atCreate directamente) */
+const Sync = {
+  async saveCourseData(courseId, ranges){
+    const c = await ensureCamposCache();
+    const campoRecId = c.byCourseId[courseId] && c.byCourseId[courseId].id;
+    if (!campoRecId) return;
+    const allTramos = await atList(T.tramos);
+    const existing = allTramos.filter(r => (r.fields.Campo||[]).includes(campoRecId));
+    if (existing.length) await atDeleteMany(T.tramos, existing.map(r=>r.id));
+    await atCreateMany(T.tramos, ranges.map(r=>({
+      Etiqueta: `${r.min}-${r.max}`, Campo:[campoRecId], HcpDesde:r.min, HcpHasta:r.max, HcpCampo:r.hcp
+    })));
+  },
+  async saveHole(matchCode, player, holeIdx, strokes){
+    const existingId = player._golpesIds && player._golpesIds[holeIdx];
+    let recId = existingId;
+    if (existingId){
+      await atUpdate(T.golpes, existingId, { Golpes: strokes });
+    } else {
+      const rec = await atCreate(T.golpes, { Hoyo: holeIdx+1, Jugador:[player.id], Golpes: strokes });
+      recId = rec.id;
+    }
+    const fresh = Store.getMatch(matchCode);
+    if (fresh){
+      const idx = fresh.players.findIndex(p=>p.id===player.id);
+      if (idx>-1){
+        if (!fresh.players[idx]._golpesIds) fresh.players[idx]._golpesIds = [];
+        fresh.players[idx]._golpesIds[holeIdx] = recId;
+        Store.saveMatch(fresh);
+      }
+    }
+  },
+  async saveCurrentHole(player, holeIdx){
+    await atUpdate(T.jugadores, player.id, { HoyoActual: holeIdx });
+  },
+  async closeMatch(match){
+    await atUpdate(T.partidas, match._airtableId, { Estado:'closed', CerradaEn: new Date().toISOString() });
+  }
+};
+
+/* ---------------- helpers ---------------- */
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function fmtDiff(n){
+  if (n === 0) return 'E';
+  return n > 0 ? ('+'+n) : String(n);
+}
+function diffClass(n){ return n===0 ? 'diff-zero' : (n>0 ? 'diff-pos' : 'diff-neg'); }
+function initials(name){
+  return (name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+}
+function hcpCampoFor(courseData, hcpPersona){
+  const ranges = (courseData && courseData.ranges) ? courseData.ranges : DEFAULT_HCP_RANGES;
+  const v = parseFloat(hcpPersona);
+  for (const r of ranges){ if (v >= r.min && v <= r.max) return r.hcp; }
+  // fuera de rango: usar el extremo más cercano
+  const sorted = [...ranges].sort((a,b)=>a.min-b.min);
+  if (v < sorted[0].min) return sorted[0].hcp;
+  return sorted[sorted.length-1].hcp;
+}
+function holesPlayedCount(player){
+  return player.holes.filter(h => h !== null && h !== undefined).length;
+}
+function strokesSum(player, uptoIndex){
+  const arr = uptoIndex===undefined ? player.holes : player.holes.slice(0, uptoIndex+1);
+  return arr.reduce((s,h)=> s + (h||0), 0);
+}
+// resultado EN VIVO (prorrateado a los hoyos jugados)
+function liveResult(match, player){
+  const played = holesPlayedCount(player);
+  if (played === 0) return {strokes:0, diff:0, played:0};
+  const strokes = strokesSum(player);
+  const parParcial = (match.par / match.holes) * played;
+  const hcpParcial = (player.hcpCampo / match.holes) * played;
+  const diff = Math.round(strokes - hcpParcial - parParcial);
+  return {strokes, diff, played};
+}
+// resultado FINAL (fórmula exacta a 18 hoyos completos)
+function finalResult(match, player){
+  const strokes = strokesSum(player);
+  const net = strokes - player.hcpCampo;
+  const diff = net - match.par;
+  return {strokes, net, diff};
+}
+function rankPlayers(match, players, useLive){
+  const withVal = players.map(p=>{
+    const r = useLive ? liveResult(match,p) : finalResult(match,p);
+    return {p, diff:r.diff, extra:r};
+  });
+  withVal.sort((a,b)=>{
+    if (a.diff !== b.diff) return a.diff - b.diff;
+    return (b.p.hcp - a.p.hcp); // empate: mayor hándicap persona por encima
+  });
+  return withVal;
+}
+
+/* posición de cada jugador hoyo a hoyo, para el gráfico de evolución */
+function positionsPerHole(match){
+  const series = {}; // playerId -> [ {hole, pos} ]
+  match.players.forEach(p=> series[p.id] = []);
+  for (let h=0; h<match.holes; h++){
+    const active = match.players.filter(p => p.holes[h] !== null && p.holes[h] !== undefined);
+    if (active.length === 0) continue;
+    const withVal = active.map(p=>{
+      const strokes = strokesSum(p, h);
+      const played = h+1;
+      const parParcial = (match.par/match.holes)*played;
+      const hcpParcial = (p.hcpCampo/match.holes)*played;
+      const diff = strokes - hcpParcial - parParcial;
+      return {p, diff};
+    });
+    withVal.sort((a,b)=> a.diff===b.diff ? (b.p.hcp-a.p.hcp) : a.diff-b.diff);
+    withVal.forEach((row,idx)=> series[row.p.id].push({hole:h+1, pos:idx+1}));
+  }
+  return series;
+}
+
+/* ---------------- estado de navegación local ---------------- */
+let CURRENT = { screen:'home' };
+
+function render(){
+  const app = document.getElementById('app');
+  try {
+    app.innerHTML = '';
+    app.appendChild(Brand());
+    const screens = {
+      home: ScreenHome, crearNombre: ScreenCrearNombre, crearCampo: ScreenCrearCampo,
+      crearRecorrido: ScreenCrearRecorrido,
+      crear2: ScreenCrear2, crear3: ScreenCrear3,
+      unirse1: ScreenUnirse1, unirse2: ScreenUnirse2, play: ScreenPlay, spectate: ScreenSpectate,
+      results: ScreenResults, consulta: ScreenResults
+    };
+    const fn = screens[CURRENT.screen] || ScreenHome;
+    app.appendChild(fn());
+  } catch(err){
+    console.error(err);
+    app.innerHTML = '';
+    app.appendChild(Brand());
+    app.appendChild(el(`<div class="card">
+      <h2 class="title">Vaya, algo ha fallado</h2>
+      <p class="sub">${(err && err.message) ? err.message : 'Error desconocido'}</p>
+      <button class="btn btn-primary" id="btnHomeErr">Volver al inicio</button>
+    </div>`));
+    document.getElementById('btnHomeErr').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  }
+}
+
+function Brand(){
+  const d = document.createElement('div');
+  d.className = 'brand';
+  d.innerHTML = `<span class="ball"></span><h1>GOLF <span>LIVE</span></h1>`;
+  return d;
+}
+function el(html){
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstChild;
+}
+function card(inner){
+  const d = document.createElement('div');
+  d.className = 'card';
+  d.innerHTML = inner;
+  return d;
+}
+
+/* ================= HOME ================= */
+function ScreenHome(){
+  const wrap = el(`<div class="center-wrap"><div class="card" style="max-width:420px;width:100%;">
+    <h2 class="title">Bienvenido ⛳</h2>
+    <p class="sub">Anota tu ronda en tiempo real y compite con el resto del grupo, hoyo a hoyo.</p>
+    <div class="stack">
+      <button class="btn btn-primary btn-block btn-lg" id="btnCrear">Crear partida</button>
+      <button class="btn btn-outline btn-block btn-lg" id="btnUnirse">Unirse a partida</button>
+    </div>
+  </div></div>`);
+  wrap.querySelector('#btnCrear').onclick = ()=>{ CURRENT = {screen:'crearNombre', data:{}}; render(); };
+  wrap.querySelector('#btnUnirse').onclick = ()=>{ CURRENT = {screen:'unirse1', data:{}}; render(); };
+  return wrap;
+}
+
+/* ================= CREAR 1a: nombre del master ================= */
+function ScreenCrearNombre(){
+  const d = CURRENT.data;
+  const wrap = card(`
+    <div class="steps"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    <h2 class="title">Nueva partida</h2>
+    <p class="sub">Eres el master de la partida. ¿Cómo te llamas?</p>
+    <label>Tu nombre</label>
+    <input type="text" id="masterName" placeholder="Ej. Vicente" value="${d.masterName||''}">
+    <div class="error-msg" id="err"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn btn-outline" id="btnBack">Atrás</button>
+      <button class="btn btn-primary btn-block" id="btnNext">Aceptar</button>
+    </div>
+  `);
+  const input = wrap.querySelector('#masterName');
+  wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  wrap.querySelector('#btnNext').onclick = ()=>{
+    const name = input.value.trim();
+    if (!name){ wrap.querySelector('#err').textContent='Escribe tu nombre.'; return; }
+    d.masterName = name;
+    if (!d.holes) d.holes = HOLE_COUNT_DEFAULT;
+    if (!d.par) d.par = PAR_DEFAULT;
+    CURRENT = {screen:'crearCampo', data:d};
+    render();
+  };
+  // Enter también avanza
+  input.addEventListener('keydown', (e)=>{ if (e.key==='Enter') wrap.querySelector('#btnNext').click(); });
+  return wrap;
+}
+
+/* ================= CREAR 1b: elegir campo (un solo toque, sin confirmar) ================= */
+function selectSingleCourse(d, entry){
+  d.courseId = entry.courseId; d.courseName = entry.nombre; d.courseImg = entry.imagen; d.campoRecordId = entry.id;
+  CURRENT = {screen:'crear2', data:d};
+  render();
+}
+function ScreenCrearCampo(){
+  const d = CURRENT.data;
+  if (!camposCache.ready){
+    ensureCamposCache().then(()=>{ if (CURRENT.screen==='crearCampo') render(); }).catch(()=>{});
+    return card(`
+      <div class="steps"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+      <h2 class="title">Elige el campo</h2>
+      <p class="sub">Cargando campos…</p>
+    `);
+  }
+  const wrap = card(`
+    <div class="steps"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+    <h2 class="title">Elige el campo</h2>
+    <p class="sub">${d.masterName}, toca un campo para continuar.</p>
+    <div class="course-grid" id="courseGrid"></div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn btn-outline btn-block" id="btnBack">Atrás</button>
+    </div>
+  `);
+  const grid = wrap.querySelector('#courseGrid');
+  camposCache.grupos.forEach(g=>{
+    const cc = el(`<div class="course-card" data-id="${g.label}">
+           <img src="${g.imagen}" alt="${g.label}">
+           <div class="overlay"></div>
+           <div class="name">${g.label}</div>
+         </div>`);
+    cc.onclick = ()=>{
+      if (g.entries.length > 1){
+        CURRENT = {screen:'crearRecorrido', data:d, grupo:g};
+      } else {
+        selectSingleCourse(d, g.entries[0]);
+        return;
+      }
+      render();
+    };
+    grid.appendChild(cc);
+  });
+  const ccOtro = el(`<div class="course-card otro" data-id="otro"><span class="plus">+</span></div>`);
+  ccOtro.onclick = ()=>{
+    d.courseId = 'otro'; d.courseName = 'Otro campo'; d.courseImg = null; d.campoRecordId = null;
+    CURRENT = {screen:'crear2', data:d};
+    render();
+  };
+  grid.appendChild(ccOtro);
+  wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'crearNombre', data:d}; render(); };
+  return wrap;
+}
+
+/* ================= CREAR 1c: elegir recorrido (solo si el club tiene varios) ================= */
+function ScreenCrearRecorrido(){
+  const d = CURRENT.data;
+  const grupo = CURRENT.grupo;
+  const wrap = card(`
+    <div class="steps"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+    <h2 class="title">${grupo.label}</h2>
+    <p class="sub">Este club tiene varios recorridos. Elige cuál vais a jugar.</p>
+    <div class="route-grid" id="routeGrid"></div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn btn-outline btn-block" id="btnBack">Atrás</button>
+    </div>
+  `);
+  const rgrid = wrap.querySelector('#routeGrid');
+  grupo.entries.forEach(entry=>{
+    const btn = el(`<button class="route-btn">${entry.recorrido || entry.nombre}<span class="rsub">${entry.nombre}</span></button>`);
+    btn.onclick = ()=> selectSingleCourse(d, entry);
+    rgrid.appendChild(btn);
+  });
+  wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'crearCampo', data:d}; render(); };
+  return wrap;
+}
+
+/* ================= CREAR 2: nº hoyos / par / tabla hándicap ================= */
+function ScreenCrear2(){
+  const d = CURRENT.data;
+
+  // Campos ya investigados (con par + indice de handicap oficial por hoyo en Airtable):
+  // se rellenan solos, sin pedir nada al usuario.
+  if (d.campoRecordId && !hoyosCache.ready){
+    ensureHoyosCache().then(()=>{ if (CURRENT.screen==='crear2') render(); }).catch(()=>{});
+  }
+  const hoyosOficiales = d.campoRecordId ? hoyosCache.byCampo[d.campoRecordId] : null;
+  if (hoyosOficiales && hoyosOficiales.length>0){
+    d.holes = hoyosOficiales.length;
+    d.par = hoyosOficiales.reduce((s,h)=> s + (h.par||0), 0);
+    const wrap = card(`
+      <div class="steps"><div class="dot done"></div><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
+      <h2 class="title">${d.courseName}</h2>
+      <p class="sub">Datos oficiales del campo.</p>
+      <div class="hoyos-ok">✓ Par y hándicap de los ${d.holes} hoyos cargados automáticamente (par total ${d.par}).</div>
+      <div class="row" style="margin-top:18px">
+        <button class="btn btn-outline" id="btnBack">Atrás</button>
+        <button class="btn btn-primary btn-block" id="btnNext">Continuar</button>
+      </div>
+    `);
+    wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'crearCampo', data:d}; render(); };
+    wrap.querySelector('#btnNext').onclick = ()=>{ CURRENT={screen:'crear3', data:d}; render(); };
+    return wrap;
+  }
+
+  // Campo sin datos oficiales todavia ("Otro campo" o uno nuevo): flujo manual/foto de siempre.
+  const existing = Store.getCourseData(d.courseId);
+  if (!d.ranges) d.ranges = existing ? existing.ranges.map(r=>({...r})) : DEFAULT_HCP_RANGES.map(r=>({...r}));
+  if (d.hcpMethod === undefined) d.hcpMethod = existing ? 'existing' : null;
+
+  const wrap = card(`
+    <div class="steps"><div class="dot done"></div><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
+    <h2 class="title">${d.courseName}</h2>
+    <p class="sub">Confirma los datos del campo.</p>
+    <div class="two-col">
+      <div><label>Número de hoyos</label><input type="number" id="holes" value="${d.holes}"></div>
+      <div><label>Par del campo</label><input type="number" id="par" value="${d.par}"></div>
+    </div>
+    <div style="height:18px"></div>
+    <label>Tabla de hándicap del campo</label>
+    <div id="hcpArea"></div>
+    <div class="error-msg" id="err"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn btn-outline" id="btnBack">Atrás</button>
+      <button class="btn btn-primary btn-block" id="btnNext">Crear partida</button>
+    </div>
+  `);
+
+  const hcpArea = wrap.querySelector('#hcpArea');
+  renderHcpArea();
+
+  function renderHcpArea(){
+    hcpArea.innerHTML = '';
+    if (existing && d.hcpMethod === 'existing'){
+      hcpArea.appendChild(el(`
+        <div style="font-size:13px;color:rgba(243,239,226,.65);background:rgba(255,255,255,.04);padding:10px 12px;border-radius:10px;">
+          Ya existe una tabla guardada para este campo (${existing.ranges.length} tramos).
+          <button class="link-btn" id="btnModificar" style="display:block;margin-top:6px;">Modificar tabla</button>
+        </div>`));
+      hcpArea.querySelector('#btnModificar').onclick = ()=>{ d.hcpMethod='manual'; renderHcpArea(); };
+      return;
+    }
+    if (!d.hcpMethod){
+      hcpArea.appendChild(el(`<div>
+        <p style="font-size:13px;color:rgba(243,239,226,.55);margin:4px 0 0;">No existe tabla para este campo todavía. Elige cómo la vas a definir:</p>
+        <div class="method-choice">
+          <div class="method-card" id="mFoto"><div class="ic">📷</div>Subir foto del ranking</div>
+          <div class="method-card" id="mManual"><div class="ic">✍️</div>Introducir a mano</div>
+        </div>
+      </div>`));
+      hcpArea.querySelector('#mFoto').onclick = ()=>{ d.hcpMethod='foto'; renderHcpArea(); };
+      hcpArea.querySelector('#mManual').onclick = ()=>{ d.hcpMethod='manual'; renderHcpArea(); };
+      return;
+    }
+    // foto o manual -> misma tabla editable (en 'foto' además se adjunta la imagen de referencia)
+    const box = el(`<div></div>`);
+    if (d.hcpMethod === 'foto'){
+      box.appendChild(el(`<div>
+        <input type="file" accept="image/*" id="fotoInput" style="margin-bottom:8px;">
+        <div style="font-size:11.5px;color:rgba(243,239,226,.45);margin-bottom:8px;">
+          La foto se guarda como referencia. De momento revisa/ajusta los números manualmente abajo (la lectura automática llegará con la integración de Airtable).
+        </div>
+        ${d.hcpPhoto ? `<img class="photo-preview" src="${d.hcpPhoto}">` : ''}
+      </div>`));
+    }
+    const table = el(`<div>
+      <table class="hcp-table"><thead><tr><th>Hcp. desde</th><th>Hcp. hasta</th><th>Hcp. campo</th><th></th></tr></thead>
+      <tbody id="hcpRows"></tbody></table>
+      <button class="link-btn" id="addRow" style="margin-top:6px;">+ añadir tramo</button>
+    </div>`);
+    box.appendChild(table);
+    hcpArea.appendChild(box);
+
+    if (d.hcpMethod==='foto'){
+      hcpArea.querySelector('#fotoInput').onchange = (ev)=>{
+        const f = ev.target.files[0]; if(!f) return;
+        const reader = new FileReader();
+        reader.onload = ()=>{ d.hcpPhoto = reader.result; renderHcpArea(); };
+        reader.readAsDataURL(f);
+      };
+    }
+    const rowsBody = hcpArea.querySelector('#hcpRows');
+    function paintRows(){
+      rowsBody.innerHTML = '';
+      d.ranges.forEach((r,i)=>{
+        const tr = el(`<tr>
+          <td><input type="number" step="0.1" value="${r.min}" data-f="min" data-i="${i}"></td>
+          <td><input type="number" step="0.1" value="${r.max}" data-f="max" data-i="${i}"></td>
+          <td><input type="number" value="${r.hcp}" data-f="hcp" data-i="${i}"></td>
+          <td><button class="mini-x" data-del="${i}">×</button></td>
+        </tr>`);
+        rowsBody.appendChild(tr);
+      });
+      rowsBody.querySelectorAll('input').forEach(inp=>{
+        inp.oninput = ()=>{ d.ranges[inp.dataset.i][inp.dataset.f] = parseFloat(inp.value)||0; };
+      });
+      rowsBody.querySelectorAll('[data-del]').forEach(btn=>{
+        btn.onclick = ()=>{ d.ranges.splice(parseInt(btn.dataset.del),1); paintRows(); };
+      });
+    }
+    paintRows();
+    hcpArea.querySelector('#addRow').onclick = ()=>{ d.ranges.push({min:0,max:0,hcp:0}); paintRows(); };
+  }
+
+  wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'crearCampo', data:d}; render(); };
+  wrap.querySelector('#btnNext').onclick = ()=>{
+    d.holes = parseInt(wrap.querySelector('#holes').value)||HOLE_COUNT_DEFAULT;
+    d.par = parseInt(wrap.querySelector('#par').value)||PAR_DEFAULT;
+    if (!d.ranges || d.ranges.length===0){ wrap.querySelector('#err').textContent='Añade al menos un tramo de hándicap.'; return; }
+    CURRENT = {screen:'crear3', data:d};
+    render();
+  };
+  return wrap;
+}
+
+/* selector de tee (color de salida) + genero, reutilizado al crear partida y al unirse */
+function TeeGeneroPicker(container, campoRecordId, onChange){
+  const opts = availableTeeGenderOptions(campoRecordId);
+  if (!opts.hasData) return null;
+  const state = { tee: opts.tees[0], genero: opts.generos[0] || 'Hombres' };
+  const box = el(`<div>
+    <label>Tee (circuito de salida)</label>
+    <div class="pill-group" id="teePills"></div>
+    ${opts.generos.length>1 ? `<label>Género</label><div class="pill-group" id="genPills"></div>` : ''}
+  </div>`);
+  container.appendChild(box);
+  const teePills = box.querySelector('#teePills');
+  function paintTees(){
+    teePills.innerHTML = '';
+    opts.tees.forEach(t=>{
+      const b = el(`<button type="button" class="pill-choice ${t===state.tee?'sel':''}">${t}</button>`);
+      b.onclick = ()=>{ state.tee = t; paintTees(); onChange(state); };
+      teePills.appendChild(b);
+    });
+  }
+  paintTees();
+  if (opts.generos.length>1){
+    const genPills = box.querySelector('#genPills');
+    function paintGen(){
+      genPills.innerHTML = '';
+      opts.generos.forEach(g=>{
+        const b = el(`<button type="button" class="pill-choice ${g===state.genero?'sel':''}">${g}</button>`);
+        b.onclick = ()=>{ state.genero = g; paintGen(); onChange(state); };
+        genPills.appendChild(b);
+      });
+    }
+    paintGen();
+  }
+  onChange(state);
+  return state;
+}
+
+/* ================= CREAR 3: datos del master como jugador + confirmar ================= */
+function ScreenCrear3(){
+  const d = CURRENT.data;
+  if (!d.masterAvatar) d.masterAvatar = null;
+  const wrap = card(`
+    <div class="steps"><div class="dot done"></div><div class="dot done"></div><div class="dot done"></div><div class="dot active"></div></div>
+    <h2 class="title">Tus datos como jugador</h2>
+    <p class="sub">${d.masterName}, indica tu hándicap para calcular tu resultado en la partida.</p>
+    <label>Tu hándicap (índice)</label>
+    <input type="number" step="0.1" id="hcp" placeholder="Ej. 15,3">
+    <div style="height:16px"></div>
+    <div id="teeGeneroArea"></div>
+    <label>Foto de perfil (opcional)</label>
+    <div class="avatar-row">
+      <div class="avatar-circle" id="avatarPreview">${d.masterAvatar?`<img src="${d.masterAvatar}">`:initials(d.masterName)}</div>
+      <div class="avatar-opts">
+        <button class="btn btn-outline" id="btnCam">📷 Cámara</button>
+        <button class="btn btn-outline" id="btnGal">🖼️ Galería</button>
+        <input type="file" accept="image/*" capture="environment" id="fileCam" class="hidden">
+        <input type="file" accept="image/*" id="fileGal" class="hidden">
+      </div>
+    </div>
+    <div class="error-msg" id="err"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn-outline" id="btnBack">Atrás</button>
+      <button class="btn btn-gold btn-block" id="btnCrear">Crear partida</button>
+    </div>
+  `);
+  let teeState = null;
+  if (d.campoRecordId){
+    teeState = TeeGeneroPicker(wrap.querySelector('#teeGeneroArea'), d.campoRecordId, (s)=>{ teeState = {...s}; });
+  }
+  function setAvatar(url){ d.masterAvatar = url; wrap.querySelector('#avatarPreview').innerHTML = `<img src="${url}">`; }
+  wrap.querySelector('#btnCam').onclick = ()=> wrap.querySelector('#fileCam').click();
+  wrap.querySelector('#btnGal').onclick = ()=> wrap.querySelector('#fileGal').click();
+  [wrap.querySelector('#fileCam'), wrap.querySelector('#fileGal')].forEach(inp=>{
+    inp.onchange = (ev)=>{ const f=ev.target.files[0]; if(!f) return;
+      const r = new FileReader(); r.onload=()=>setAvatar(r.result); r.readAsDataURL(f); };
+  });
+  wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'crear2', data:d}; render(); };
+  wrap.querySelector('#btnCrear').onclick = async ()=>{
+    const hcp = parseFloat(wrap.querySelector('#hcp').value);
+    if (isNaN(hcp)){ wrap.querySelector('#err').textContent='Introduce tu hándicap.'; return; }
+    const btn = wrap.querySelector('#btnCrear');
+    const originalText = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Creando...';
+    wrap.querySelector('#err').textContent = '';
+    try {
+      let hcpCampo;
+      if (teeState){
+        hcpCampo = computeHcpCampo(d.campoRecordId, teeState.tee, teeState.genero, hcp);
+      }
+      if (hcpCampo === undefined || hcpCampo === null){
+        // sin datos oficiales (o campo "Otro"): flujo manual de siempre
+        if (d.hcpMethod === 'manual' || d.hcpMethod === 'foto'){
+          Store.saveCourseData(d.courseId, {ranges:d.ranges, photo:d.hcpPhoto||null});
+          Sync.saveCourseData(d.courseId, d.ranges).catch(err=>console.error('Airtable tramos:', err));
+        }
+        const courseData = Store.getCourseData(d.courseId) || {ranges:d.ranges};
+        hcpCampo = hcpCampoFor(courseData, hcp);
+      }
+      const code = Store.newCode();
+      const partidaRec = await atCreate(T.partidas, {
+        Codigo: code,
+        ...(d.campoRecordId ? { Campo:[d.campoRecordId] } : {}),
+        Hoyos: d.holes, Par: d.par, CreadaEn: new Date().toISOString(), Estado:'open'
+      });
+      const masterRec = await atCreate(T.jugadores, {
+        Nombre: d.masterName, Partida:[partidaRec.id], Hcp: hcp, HcpCampo: hcpCampo, EsMaster:true, HoyoActual:0
+      });
+      if (d.masterAvatar){
+        atUploadAttachment(masterRec.id, AVATAR_FIELD_ID, d.masterAvatar, 'avatar.jpg').catch(err=>console.error('Avatar upload:',err));
+      }
+      const master = {
+        id: masterRec.id, name:d.masterName, hcp, hcpCampo, avatar:d.masterAvatar, isMaster:true,
+        holes: new Array(d.holes).fill(null), currentHole:0, _golpesIds: new Array(d.holes).fill(null)
+      };
+      const match = {
+        _airtableId: partidaRec.id, _campoRecordId: d.campoRecordId||null,
+        code, campoId:d.courseId, campoNombre:d.courseName, campoImagen:d.courseImg,
+        holes:d.holes, par:d.par, createdAt: Date.now(), masterId: master.id,
+        players:[master], status:'open'
+      };
+      Store.saveMatch(match);
+      CURRENT = {screen:'play', code, playerId: master.id};
+      render();
+    } catch(err){
+      console.error(err);
+      wrap.querySelector('#err').textContent = 'No se pudo crear la partida (revisa tu conexión). Inténtalo de nuevo.';
+      btn.disabled = false; btn.textContent = originalText;
+    }
+  };
+  return wrap;
+}
+
+/* ================= UNIRSE 1: código ================= */
+async function attemptJoinCode(code, showErr){
+  if (!/^\d{4}$/.test(code)){ if(showErr) showErr('El código debe tener 4 dígitos.'); return false; }
+  let match = Store.getMatch(code);
+  if (!match){
+    try { match = await pullAndMerge(code); } catch(e){ console.error(e); }
+  }
+  if (!match){ if(showErr) showErr('No existe ninguna partida con ese código.'); return false; }
+  if (match.status === 'closed'){
+    CURRENT = {screen:'consulta', code, playerId:null};
+  } else {
+    CURRENT = {screen:'unirse2', data:{code, match}};
+  }
+  return true;
+}
+
+function ScreenUnirse1(){
+  const d = CURRENT.data;
+  const wrap = card(`
+    <h2 class="title">Unirse a partida</h2>
+    <p class="sub">Introduce el código de 4 dígitos que te ha dado el master.</p>
+    <input type="text" class="code-input" id="code" maxlength="4" placeholder="0000" inputmode="numeric" value="${d.prefillCode||''}">
+    <div class="error-msg" id="err">${d.prefillError||''}</div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn-outline" id="btnBack">Atrás</button>
+      <button class="btn btn-primary btn-block" id="btnGo">Buscar</button>
+    </div>
+  `);
+  wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  wrap.querySelector('#btnGo').onclick = async ()=>{
+    const code = wrap.querySelector('#code').value.trim();
+    const btn = wrap.querySelector('#btnGo');
+    const originalText = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Buscando...';
+    const ok = await attemptJoinCode(code, (msg)=>{ wrap.querySelector('#err').textContent = msg; });
+    btn.disabled = false; btn.textContent = originalText;
+    if (ok) render();
+  };
+  return wrap;
+}
+
+/* ================= UNIRSE 2: preview + confirmar + datos jugador ================= */
+function ScreenUnirse2(){
+  const d = CURRENT.data;
+  const m = d.match;
+  const step = d.confirmStep || 'preview';
+  let inner;
+  if (step === 'preview'){
+    inner = `
+      <div class="match-preview">
+        <img src="${m.campoImagen || 'https://images.unsplash.com/photo-1677477009126-aad941137d86?w=800&q=80&auto=format&fit=crop'}">
+        <div class="info">
+          <h3>${m.campoNombre}</h3>
+          <span>Creada por ${m.players.find(p=>p.isMaster)?.name || '—'}</span>
+        </div>
+      </div>
+      <div class="meta-chip">📅 ${new Date(m.createdAt).toLocaleDateString('es-ES')}</div>
+      <div class="meta-chip">⛳ ${m.holes} hoyos</div>
+      <div class="meta-chip">🏌️ Par ${m.par}</div>
+      <div class="meta-chip">👥 ${m.players.length} jugador(es)</div>
+      <p class="sub" style="margin-top:18px;">¿Quieres unirte a esta partida?</p>
+      <div class="row">
+        <button class="btn btn-outline btn-block" id="btnNo">No</button>
+        <button class="btn btn-primary btn-block" id="btnSi">Sí, unirme</button>
+      </div>
+    `;
+  } else if (step === 'role'){
+    inner = `
+      <h2 class="title">¿Cómo quieres entrar?</h2>
+      <p class="sub">Elige una opción para continuar.</p>
+      <div class="method-choice">
+        <div class="method-card" id="rolJugador"><div class="ic">🏌️</div>Jugador<br><span style="font-size:11.5px;color:rgba(243,239,226,.5);">Anotas tus golpes</span></div>
+        <div class="method-card" id="rolEspectador"><div class="ic">👀</div>Espectador<br><span style="font-size:11.5px;color:rgba(243,239,226,.5);">Solo ves el ranking</span></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-outline btn-block" id="btnBack">Atrás</button>
+      </div>
+    `;
+  } else {
+    inner = `
+      <h2 class="title">Tus datos</h2>
+      <label>Tu nombre</label>
+      <input type="text" id="pname" placeholder="Ej. Marisa">
+      <div style="height:14px"></div>
+      <label>Tu hándicap (índice)</label>
+      <input type="number" step="0.1" id="phcp" placeholder="Ej. 22,5">
+      <div style="height:16px"></div>
+      <div id="teeGeneroArea"></div>
+      <label>Foto de perfil (opcional)</label>
+      <div class="avatar-row">
+        <div class="avatar-circle" id="avatarPreview">?</div>
+        <div class="avatar-opts">
+          <button class="btn btn-outline" id="btnCam">📷 Cámara</button>
+          <button class="btn btn-outline" id="btnGal">🖼️ Galería</button>
+          <input type="file" accept="image/*" capture="environment" id="fileCam" class="hidden">
+          <input type="file" accept="image/*" id="fileGal" class="hidden">
+        </div>
+      </div>
+      <div class="error-msg" id="err"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-outline" id="btnBack">Atrás</button>
+        <button class="btn btn-gold btn-block" id="btnJoin">Unirme</button>
+      </div>
+    `;
+  }
+  const wrap = card(inner);
+  if (step === 'preview'){
+    wrap.querySelector('#btnNo').onclick = ()=>{ CURRENT={screen:'unirse1', data:{}}; render(); };
+    wrap.querySelector('#btnSi').onclick = ()=>{ d.confirmStep='role'; CURRENT={screen:'unirse2', data:d}; render(); };
+  } else if (step === 'role'){
+    wrap.querySelector('#btnBack').onclick = ()=>{ d.confirmStep='preview'; CURRENT={screen:'unirse2', data:d}; render(); };
+    wrap.querySelector('#rolJugador').onclick = ()=>{ d.confirmStep='form'; CURRENT={screen:'unirse2', data:d}; render(); };
+    wrap.querySelector('#rolEspectador').onclick = ()=>{ CURRENT={screen:'spectate', code:m.code, playerId:null}; render(); };
+  } else {
+    let avatar = null;
+    let teeState = null;
+    if (m._campoRecordId){
+      teeState = TeeGeneroPicker(wrap.querySelector('#teeGeneroArea'), m._campoRecordId, (s)=>{ teeState = {...s}; });
+    }
+    function setAvatar(url){ avatar=url; wrap.querySelector('#avatarPreview').innerHTML = `<img src="${url}">`; }
+    wrap.querySelector('#btnCam').onclick = ()=> wrap.querySelector('#fileCam').click();
+    wrap.querySelector('#btnGal').onclick = ()=> wrap.querySelector('#fileGal').click();
+    [wrap.querySelector('#fileCam'), wrap.querySelector('#fileGal')].forEach(inp=>{
+      inp.onchange = (ev)=>{ const f=ev.target.files[0]; if(!f) return;
+        const r = new FileReader(); r.onload=()=>setAvatar(r.result); r.readAsDataURL(f); };
+    });
+    wrap.querySelector('#btnBack').onclick = ()=>{ d.confirmStep='role'; CURRENT={screen:'unirse2', data:d}; render(); };
+    wrap.querySelector('#btnJoin').onclick = async ()=>{
+      const name = wrap.querySelector('#pname').value.trim();
+      const hcp = parseFloat(wrap.querySelector('#phcp').value);
+      if (!name){ wrap.querySelector('#err').textContent='Escribe tu nombre.'; return; }
+      if (isNaN(hcp)){ wrap.querySelector('#err').textContent='Introduce tu hándicap.'; return; }
+      const btn = wrap.querySelector('#btnJoin');
+      const originalText = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Uniéndote...';
+      wrap.querySelector('#err').textContent = '';
+      try {
+        let fresh = Store.getMatch(m.code);
+        if (!fresh) fresh = await pullAndMerge(m.code);
+        if (!fresh){ wrap.querySelector('#err').textContent='La partida ya no está disponible.'; btn.disabled=false; btn.textContent=originalText; return; }
+        let hcpCampo = teeState ? computeHcpCampo(fresh._campoRecordId, teeState.tee, teeState.genero, hcp) : null;
+        if (hcpCampo === undefined || hcpCampo === null){
+          const courseData = Store.getCourseData(fresh.campoId) || {ranges:DEFAULT_HCP_RANGES};
+          hcpCampo = hcpCampoFor(courseData, hcp);
+        }
+        let playerId;
+        if (fresh._airtableId){
+          const rec = await atCreate(T.jugadores, { Nombre:name, Partida:[fresh._airtableId], Hcp:hcp, HcpCampo:hcpCampo, EsMaster:false, HoyoActual:0 });
+          playerId = rec.id;
+          if (avatar) atUploadAttachment(rec.id, AVATAR_FIELD_ID, avatar, 'avatar.jpg').catch(err=>console.error('Avatar upload:',err));
+        } else {
+          playerId = uid(); // partida local de demo, sin Airtable
+        }
+        const player = { id:playerId, name, hcp, hcpCampo, avatar, isMaster:false,
+          holes:new Array(fresh.holes).fill(null), currentHole:0, _golpesIds:new Array(fresh.holes).fill(null) };
+        fresh.players.push(player);
+        Store.saveMatch(fresh);
+        CURRENT = {screen:'play', code:fresh.code, playerId:player.id};
+        render();
+      } catch(err){
+        console.error(err);
+        wrap.querySelector('#err').textContent = 'No se pudo unir a la partida (revisa tu conexión). Inténtalo de nuevo.';
+        btn.disabled = false; btn.textContent = originalText;
+      }
+    };
+    if (!wrap.querySelector('#avatarPreview').innerHTML || wrap.querySelector('#avatarPreview').innerHTML==='?'){
+      // se actualizará con initials al escribir el nombre
+      wrap.querySelector('#pname').oninput = (e)=>{
+        if (!avatar) wrap.querySelector('#avatarPreview').innerHTML = initials(e.target.value)||'?';
+      };
+    }
+  }
+  return wrap;
+}
+
+/* ================= PLAY: anotación + ranking en vivo ================= */
+let closeModalOpen = false;
+let liveScorecardOpen = false;
+
+function ScorecardGrid(match, playersOrdered){
+  const hoyos = match._campoRecordId ? hoyosCache.byCampo[match._campoRecordId] : null;
+  const parRow = (hoyos && hoyos.length===match.holes) ? hoyos.map(h=>h.par) : new Array(match.holes).fill(Math.round(match.par/match.holes));
+  const wrap = document.createElement('div');
+  wrap.className = 'scorecard-wrap';
+  const thead = '<tr><th>Jugador</th>' + Array.from({length:match.holes},(_,i)=>`<th>${i+1}</th>`).join('') + '<th>Total</th></tr>';
+  const parTotal = parRow.reduce((s,p)=>s+p,0);
+  const parTr = '<tr><td class="pname-cell par-row">Par</td>' + parRow.map(p=>`<td class="par-row">${p}</td>`).join('') + `<td class="par-row">${parTotal}</td></tr>`;
+  const rows = playersOrdered.map(p=>{
+    const cells = p.holes.map((h,i)=>{
+      if (h===null || h===undefined) return '<td>-</td>';
+      const par = parRow[i];
+      const cls = h<par ? 'under' : (h>par ? 'over' : '');
+      return `<td class="${cls}">${h}</td>`;
+    }).join('');
+    const total = strokesSum(p);
+    return `<tr><td class="pname-cell">${p.name}${p.isMaster?' 👑':''}</td>${cells}<td>${total||'-'}</td></tr>`;
+  }).join('');
+  wrap.innerHTML = `<table class="scorecard-grid"><thead>${thead}</thead><tbody>${parTr}${rows}</tbody></table>`;
+  return wrap;
+}
+
+function LiveScorecardModal(match){
+  const ranked = rankPlayers(match, match.players, true);
+  const bg = el(`<div class="close-modal-bg"><div class="card close-modal" style="max-width:920px;">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <h2 class="title" style="font-size:22px;margin:0;">Golpes por hoyo</h2>
+      <button class="btn btn-outline" id="btnCerrarSC">Volver</button>
+    </div>
+  </div></div>`);
+  bg.querySelector('.close-modal').appendChild(ScorecardGrid(match, ranked.map(r=>r.p)));
+  bg.querySelector('#btnCerrarSC').onclick = ()=>{ liveScorecardOpen=false; render(); };
+  bg.addEventListener('click', (e)=>{ if(e.target===bg){ liveScorecardOpen=false; render(); } });
+  return bg;
+}
+
+function ScreenPlay(){
+  const match = Store.getMatch(CURRENT.code);
+  if (!match){ CURRENT={screen:'home'}; render(); return document.createElement('div'); }
+  if (match.status === 'closed'){ CURRENT = {screen:'results', code:match.code, playerId:CURRENT.playerId}; render(); return document.createElement('div'); }
+
+  const me = match.players.find(p=>p.id===CURRENT.playerId) || match.players[0];
+  const holeIdx = me.currentHole || 0;
+
+  const wrap = document.createElement('div');
+  const topBar = el(`<div class="row" style="margin-bottom:10px;">
+    <button class="btn btn-outline" id="btnMenu">← Menú principal</button>
+  </div>`);
+  topBar.querySelector('#btnMenu').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  wrap.appendChild(topBar);
+  wrap.appendChild(el(`<div class="meta-chip">⛳ ${match.campoNombre}</div>`));
+  wrap.appendChild(el(`<div class="meta-chip">Código: <b style="color:var(--dorado-claro)">&nbsp;${match.code}</b></div>`));
+  if (me.isMaster){
+    const shareBtn = el(`<button class="btn btn-gold" id="btnShare" style="padding:7px 12px;font-size:12.5px;margin-left:6px;">📲 Compartir por WhatsApp</button>`);
+    shareBtn.onclick = ()=>{
+      const link = location.origin + location.pathname + '?code=' + match.code;
+      const text = `⛳ ¡Únete a nuestra partida en ${match.campoNombre}! Código: ${match.code}\n${link}`;
+      window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+    };
+    wrap.appendChild(shareBtn);
+  }
+  wrap.appendChild(el(`<div style="height:14px"></div>`));
+
+  const grid = el(`<div class="play-grid"></div>`);
+  grid.appendChild(RankPanel(match, me));
+  grid.appendChild(ScorePanel(match, me, holeIdx));
+  wrap.appendChild(grid);
+
+  wrap.appendChild(el(`<footer class="hint">El ranking se sincroniza en vivo entre todos los jugadores vía Airtable (cada 6s, o pulsa Actualizar).</footer>`));
+
+  if (closeModalOpen) wrap.appendChild(CloseModal(match));
+  if (liveScorecardOpen) wrap.appendChild(LiveScorecardModal(match));
+  return wrap;
+}
+
+/* ================= ESPECTADOR: solo ver el ranking en vivo ================= */
+function ScreenSpectate(){
+  const match = Store.getMatch(CURRENT.code);
+  if (!match){ CURRENT={screen:'home'}; render(); return document.createElement('div'); }
+  if (match.status === 'closed'){ CURRENT = {screen:'results', code:match.code, playerId:null}; render(); return document.createElement('div'); }
+
+  const wrap = document.createElement('div');
+  const topBar = el(`<div class="row" style="margin-bottom:10px;">
+    <button class="btn btn-outline" id="btnMenu">← Menú principal</button>
+  </div>`);
+  topBar.querySelector('#btnMenu').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  wrap.appendChild(topBar);
+  wrap.appendChild(el(`<div class="meta-chip">⛳ ${match.campoNombre}</div>`));
+  wrap.appendChild(el(`<div class="meta-chip">👀 Modo espectador</div>`));
+  wrap.appendChild(el(`<div style="height:14px"></div>`));
+  wrap.appendChild(RankPanel(match, {id:'__spectator__'}));
+  wrap.appendChild(el(`<footer class="hint">El ranking se sincroniza en vivo entre todos los jugadores vía Airtable (cada 6s, o pulsa Actualizar).</footer>`));
+  return wrap;
+}
+
+function RankPanel(match, me){
+  const panel = el(`<div class="card rank-panel">
+    <div class="rank-header"><h3>Ranking en vivo</h3>
+      <button class="refresh-btn" id="refreshBtn">⟳ Actualizar</button>
+    </div>
+    <div id="rows"></div>
+  </div>`);
+  panel.querySelector('#refreshBtn').onclick = async ()=>{
+    if (match._airtableId){ await pullAndMerge(match.code).catch(err=>console.error(err)); }
+    render();
+  };
+  const rows = panel.querySelector('#rows');
+  const ranked = rankPlayers(match, match.players, true);
+  ranked.forEach((row,idx)=>{
+    const p = row.p;
+    const r = row.extra;
+    const isMe = p.id===me.id;
+    rows.appendChild(el(`
+      <div class="player-row ${isMe?'you-row':''}">
+        <div class="pos-num">${idx+1}</div>
+        <div class="mini-avatar">${p.avatar?`<img src="${p.avatar}">`:initials(p.name)}</div>
+        <div>
+          <div class="p-name">${p.name}${p.isMaster?' 👑':''}</div>
+          <div class="p-sub">Hoyo ${holesPlayedCount(p)}/${match.holes} · hcp ${p.hcp}</div>
+        </div>
+        <div class="p-total">${r.strokes||0}</div>
+        <div class="p-diff ${diffClass(r.diff)}">${holesPlayedCount(p)? fmtDiff(r.diff) : '—'}</div>
+      </div>
+    `));
+  });
+  return panel;
+}
+
+function ScorePanel(match, me, holeIdx){
+  const hoyos = match._campoRecordId ? hoyosCache.byCampo[match._campoRecordId] : null;
+  const hoyoOficial = (hoyos && hoyos.length===match.holes) ? hoyos[holeIdx] : null;
+  const par = hoyoOficial ? hoyoOficial.par : (match.par / match.holes);
+  const parLabel = hoyoOficial ? `Par ${par}${hoyoOficial.indice?` · Hcp. hoyo ${hoyoOficial.indice}`:''}` : `Par aprox. ${par.toFixed(1)}`;
+  const current = me.holes[holeIdx];
+  const panel = el(`<div class="card score-panel">
+    <div class="hole-nav">
+      <button class="nav-arrow" id="prevHole" ${holeIdx===0?'disabled':''}>‹</button>
+      <div class="hole-badge">HOYO</div>
+      <button class="nav-arrow" id="nextHole" ${holeIdx===match.holes-1?'disabled':''}>›</button>
+    </div>
+    <div class="hole-number">${holeIdx+1}</div>
+    <div class="hole-par">${parLabel} · ${me.name}</div>
+    <div class="strokes-input-wrap">
+      <button class="stepper-btn" id="minus">−</button>
+      <input class="strokes-display" type="number" id="strokesVal" value="${current!==null && current!==undefined ? current : Math.round(par)}">
+      <button class="stepper-btn" id="plus">+</button>
+    </div>
+    <div class="registered-tag" id="regTag">${current!==null && current!==undefined ? '✓ Registrado' : ''}</div>
+    <button class="btn btn-red btn-block btn-lg" id="btnRegistrar">Registrar</button>
+    <button class="btn btn-outline btn-block" id="btnVerTodos" style="margin-top:10px;">📋 Ver golpes por hoyo de todos</button>
+    <div class="holes-strip" id="strip"></div>
+    ${me.isMaster ? `<div class="close-master"><button class="btn btn-gold btn-block" id="btnCerrar" ${holeIdx!==match.holes-1 || (me.holes[match.holes-1]===null||me.holes[match.holes-1]===undefined) ? 'disabled':''}>Cerrar partida</button>
+      <div class="demo-note">Solo el master puede cerrar, y únicamente tras registrar el hoyo ${match.holes}.</div></div>` : ''}
+  </div>`);
+  panel.querySelector('#btnVerTodos').onclick = ()=>{ liveScorecardOpen = true; render(); };
+
+  const strip = panel.querySelector('#strip');
+  for (let i=0;i<match.holes;i++){
+    const filled = me.holes[i]!==null && me.holes[i]!==undefined;
+    const cell = el(`<div class="hs-cell ${filled?'filled':''} ${i===holeIdx?'current':''}"><span class="n">${i+1}</span>${filled?me.holes[i]:'-'}</div>`);
+    cell.onclick = ()=>{ me.currentHole = i; saveAndRefresh(match, {currentHole:i}); };
+    strip.appendChild(cell);
+  }
+
+  const valInput = panel.querySelector('#strokesVal');
+  panel.querySelector('#minus').onclick = ()=>{ valInput.value = Math.max(1, parseInt(valInput.value||1)-1); };
+  panel.querySelector('#plus').onclick = ()=>{ valInput.value = parseInt(valInput.value||1)+1; };
+  panel.querySelector('#prevHole').onclick = ()=>{ const h=Math.max(0,holeIdx-1); me.currentHole=h; saveAndRefresh(match, {currentHole:h}); };
+  panel.querySelector('#nextHole').onclick = ()=>{ const h=Math.min(match.holes-1,holeIdx+1); me.currentHole=h; saveAndRefresh(match, {currentHole:h}); };
+  panel.querySelector('#btnRegistrar').onclick = ()=>{
+    const v = parseInt(valInput.value);
+    if (!v || v<1) return;
+    me.holes[holeIdx] = v;
+    if (holeIdx < match.holes-1) me.currentHole = holeIdx+1;
+    saveAndRefresh(match, {holeIdx, strokes:v, currentHole: me.currentHole});
+  };
+  const btnCerrar = panel.querySelector('#btnCerrar');
+  if (btnCerrar) btnCerrar.onclick = ()=>{ closeModalOpen = true; render(); };
+
+  function saveAndRefresh(m, change){
+    // escribir el jugador actualizado dentro del match fresco (evita condiciones de carrera simples)
+    const fresh = Store.getMatch(m.code);
+    const idx = fresh.players.findIndex(p=>p.id===me.id);
+    fresh.players[idx] = me;
+    Store.saveMatch(fresh);
+    render();
+    if (m._airtableId && change){
+      markMineDirty();
+      if (change.holeIdx !== undefined){
+        Sync.saveHole(m.code, me, change.holeIdx, change.strokes).catch(err=>console.error('Airtable golpe:',err));
+      }
+      if (change.currentHole !== undefined){
+        Sync.saveCurrentHole(me, change.currentHole).catch(err=>console.error('Airtable hoyo actual:',err));
+      }
+    }
+  }
+  return panel;
+}
+
+function CloseModal(match){
+  const rows = match.players.map(p=>{
+    const played = holesPlayedCount(p);
+    const complete = played === match.holes;
+    return `<div class="warn-row"><span>${p.name}</span><span class="pill ${complete?'ok':''}">${played}/${match.holes} hoyos ${complete?'':'⚠️'}</span></div>`;
+  }).join('');
+  const incomplete = match.players.some(p=>holesPlayedCount(p) < match.holes);
+  const bg = el(`<div class="close-modal-bg"><div class="card close-modal">
+    <h2 class="title">Cerrar partida</h2>
+    <p class="sub">Resumen antes de generar la clasificación final.</p>
+    ${rows}
+    ${incomplete ? `<div class="error-msg" style="margin-top:10px;">Hay jugadores sin los ${match.holes} hoyos registrados. Si cierras ahora, sus resultados se calculan con lo registrado hasta el momento.</div>` : ''}
+    <div class="row" style="margin-top:16px">
+      <button class="btn btn-outline btn-block" id="btnCancel">Cancelar</button>
+      <button class="btn btn-red btn-block" id="btnConfirm">${incomplete?'Cerrar de todos modos':'Cerrar partida'}</button>
+    </div>
+  </div></div>`);
+  bg.querySelector('#btnCancel').onclick = ()=>{ closeModalOpen=false; render(); };
+  bg.querySelector('#btnConfirm').onclick = ()=>{
+    const fresh = Store.getMatch(match.code);
+    fresh.status = 'closed';
+    fresh.closedAt = Date.now();
+    Store.saveMatch(fresh);
+    closeModalOpen = false;
+    CURRENT = {screen:'results', code:fresh.code, playerId:CURRENT.playerId};
+    render();
+    if (fresh._airtableId){
+      Sync.closeMatch(fresh).catch(err=>console.error('Airtable cierre:',err));
+    }
+  };
+  return bg;
+}
+
+/* ================= RESULTADOS / ANÁLISIS ================= */
+let resultsTab = 'clasificacion';
+const compareSelection = new Set();
+
+/* ---- generación del informe PDF ---- */
+function buildReportPDF(match, ranked, comentarios){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 16;
+  doc.setFontSize(18); doc.text('Golf Live — Informe de partida', 14, y); y+=9;
+  doc.setFontSize(11);
+  doc.text(`Campo: ${match.campoNombre}`, 14, y); y+=6;
+  doc.text(`Fecha: ${new Date(match.createdAt).toLocaleDateString('es-ES')}`, 14, y); y+=6;
+  doc.text(`Código: ${match.code}`, 14, y); y+=10;
+
+  doc.setFontSize(14); doc.text('Clasificación', 14, y); y+=7;
+  doc.setFontSize(10);
+  ranked.forEach((row,idx)=>{
+    doc.text(`${idx+1}. ${row.p.name} — ${row.extra.strokes} golpes — ${fmtDiff(row.diff)}`, 14, y);
+    y+=6;
+  });
+
+  y+=6;
+  if (y>250){ doc.addPage(); y=16; }
+  doc.setFontSize(14); doc.text('Golpes por hoyo', 14, y); y+=7;
+  doc.setFontSize(7.5);
+  const colW = match.holes>18?7:8, x0=14, nameW=28;
+  doc.text('Jugador', x0, y);
+  for (let h=0; h<match.holes; h++){ doc.text(String(h+1), x0+nameW+h*colW, y); }
+  y+=5;
+  ranked.forEach(row=>{
+    if (y>285){ doc.addPage(); y=16; }
+    doc.text((row.p.name||'').slice(0,14), x0, y);
+    row.p.holes.forEach((val,h)=>{ doc.text(val!=null?String(val):'-', x0+nameW+h*colW, y); });
+    y+=5;
+  });
+
+  if (comentarios && comentarios.trim()){
+    y+=8;
+    if (y>260){ doc.addPage(); y=16; }
+    doc.setFontSize(12); doc.text('Comentarios', 14, y); y+=6;
+    doc.setFontSize(10);
+    doc.text(doc.splitTextToSize(comentarios, 180), 14, y);
+  }
+  return doc;
+}
+
+function ScreenResults(){
+  const match = Store.getMatch(CURRENT.code);
+  if (!match) { CURRENT={screen:'home'}; render(); return document.createElement('div'); }
+  const wrap = document.createElement('div');
+  const topBar = el(`<div class="row" style="margin-bottom:10px;">
+    <button class="btn btn-outline" id="btnMenu">← Menú principal</button>
+  </div>`);
+  topBar.querySelector('#btnMenu').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  wrap.appendChild(topBar);
+  wrap.appendChild(el(`<div>
+    <div class="meta-chip">⛳ ${match.campoNombre}</div><div class="meta-chip">Código ${match.code}</div><div class="meta-chip">${match.status==='closed'?'🔒 Cerrada':'🟢 En curso'}</div>
+  </div>`));
+
+  const ranked = rankPlayers(match, match.players, false);
+
+  const top = card(`
+    <div class="row" style="justify-content:space-between;align-items:flex-start;">
+      <h2 class="title">Clasificación final</h2>
+      <div class="results-actions">
+        <button class="btn btn-outline" id="btnInforme" style="font-size:12.5px;padding:8px 12px;">📄 Informe de partida</button>
+        <button class="btn btn-gold" id="btnWhatsappPDF" style="font-size:12.5px;padding:8px 12px;">📲 Enviar por WhatsApp</button>
+      </div>
+    </div>
+    <div class="podium" id="podium"></div>
+  `);
+  const podiumEl = top.querySelector('#podium');
+  const order = [1,0,2]; // 2º-1º-3º visualmente
+  order.forEach(i=>{
+    const row = ranked[i]; if(!row) return;
+    const p = row.p;
+    podiumEl.appendChild(el(`
+      <div class="pod-slot pod-${i+1}">
+        <div class="mini-avatar" style="width:56px;height:56px;">${p.avatar?`<img src="${p.avatar}">`:initials(p.name)}</div>
+        <div class="bar">${i+1}</div>
+        <div class="pname">${p.name}</div>
+        <div class="presult">${fmtDiff(row.diff)}</div>
+      </div>
+    `));
+  });
+  wrap.appendChild(top);
+
+  const tabs = el(`<div class="tabs">
+    <button class="tab-btn ${resultsTab==='clasificacion'?'active':''}" data-t="clasificacion">Tabla general</button>
+    <button class="tab-btn ${resultsTab==='detalle'?'active':''}" data-t="detalle">Detalle por jugador</button>
+    <button class="tab-btn ${resultsTab==='comparativa'?'active':''}" data-t="comparativa">Comparativa</button>
+    <button class="tab-btn ${resultsTab==='analisis'?'active':''}" data-t="analisis">Análisis de la partida</button>
+  </div>`);
+  tabs.querySelectorAll('.tab-btn').forEach(b=> b.onclick = ()=>{ resultsTab=b.dataset.t; render(); });
+  wrap.appendChild(tabs);
+
+  if (resultsTab==='clasificacion') wrap.appendChild(ClasificacionTable(match, ranked));
+  if (resultsTab==='detalle') wrap.appendChild(DetalleJugador(match, ranked));
+  if (resultsTab==='comparativa') wrap.appendChild(ComparativaTab(match, ranked));
+  if (resultsTab==='analisis') wrap.appendChild(AnalisisPartida(match, ranked));
+
+  const comentariosCard = card(`
+    <h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Comentarios de la partida</h3>
+    <textarea class="comments" id="comentariosTxt" placeholder="Anécdotas, apuestas, lo que queráis recordar de esta ronda...">${match.comentarios||''}</textarea>
+  `);
+  wrap.appendChild(comentariosCard);
+  const comentariosTxt = comentariosCard.querySelector('#comentariosTxt');
+  comentariosTxt.onblur = ()=>{
+    const val = comentariosTxt.value;
+    if (val === (match.comentarios||'')) return;
+    match.comentarios = val;
+    Store.saveMatch(match);
+    if (match._airtableId) atUpdate(T.partidas, match._airtableId, {Comentarios: val}).catch(err=>console.error('Airtable comentarios:',err));
+  };
+
+  top.querySelector('#btnInforme').onclick = ()=>{
+    const doc = buildReportPDF(match, ranked, comentariosTxt.value);
+    window.open(doc.output('bloburl'), '_blank');
+  };
+  top.querySelector('#btnWhatsappPDF').onclick = async ()=>{
+    const doc = buildReportPDF(match, ranked, comentariosTxt.value);
+    const blob = doc.output('blob');
+    const file = new File([blob], `golf-live-${match.code}.pdf`, {type:'application/pdf'});
+    if (navigator.canShare && navigator.canShare({files:[file]})){
+      try { await navigator.share({files:[file], title:'Informe de partida', text:`⛳ Resultado de la partida en ${match.campoNombre}`}); }
+      catch(e){ /* el usuario canceló el share */ }
+    } else {
+      const a = document.createElement('a');
+      a.href = doc.output('bloburl'); a.download = `golf-live-${match.code}.pdf`; a.click();
+      alert('Tu navegador no permite compartir el archivo directamente: se ha descargado el PDF para que lo envíes por WhatsApp a mano.');
+    }
+  };
+
+  return wrap;
+}
+
+function ClasificacionTable(match, ranked){
+  const rows = ranked.map((row,idx)=>{
+    const p=row.p;
+    return `<tr>
+      <td>${idx+1}</td>
+      <td>${p.name}${p.isMaster?' 👑':''}</td>
+      <td>${p.hcp}</td>
+      <td>${p.hcpCampo}</td>
+      <td>${row.extra.strokes}</td>
+      <td class="${diffClass(row.diff)}" style="font-weight:700">${fmtDiff(row.diff)}</td>
+    </tr>`;
+  }).join('');
+  const wrap = document.createElement('div');
+  wrap.appendChild(card(`<table class="results-table">
+    <thead><tr><th>#</th><th>Jugador</th><th>Hcp.</th><th>Hcp. campo</th><th>Golpes</th><th>Resultado</th></tr></thead>
+    <tbody>${rows}</tbody></table>`));
+  const scCard = card(`<h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0 0 4px;color:var(--dorado-claro);">Golpes por hoyo (de mejor a peor)</h3>`);
+  scCard.appendChild(ScorecardGrid(match, ranked.map(r=>r.p)));
+  wrap.appendChild(scCard);
+  return wrap;
+}
+
+/* ================= COMPARATIVA: elegir jugadores y verlos lado a lado ================= */
+function ComparativaTab(match, ranked){
+  const wrap = document.createElement('div');
+  if (compareSelection.size===0) ranked.slice(0,2).forEach(r=> compareSelection.add(r.p.id));
+
+  const listCard = card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Elige a quién comparar</h3><div class="compare-list" id="compList"></div>`);
+  const list = listCard.querySelector('#compList');
+  ranked.forEach(row=>{
+    const p = row.p;
+    const item = el(`<label class="compare-check">
+      <input type="checkbox" ${compareSelection.has(p.id)?'checked':''}>
+      <div class="mini-avatar" style="width:30px;height:30px;font-size:11px;">${p.avatar?`<img src="${p.avatar}">`:initials(p.name)}</div>
+      <span class="p-name">${p.name}</span>
+    </label>`);
+    item.querySelector('input').onchange = (e)=>{
+      if (e.target.checked) compareSelection.add(p.id); else compareSelection.delete(p.id);
+      render();
+    };
+    list.appendChild(item);
+  });
+  wrap.appendChild(listCard);
+
+  const seleccionados = ranked.filter(r=>compareSelection.has(r.p.id));
+  if (seleccionados.length < 2){
+    wrap.appendChild(card(`<p class="sub" style="margin:0;">Elige al menos 2 jugadores para ver la comparativa.</p>`));
+    return wrap;
+  }
+
+  const tableCard = card(`<h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0 0 8px;color:var(--dorado-claro);">Golpes por hoyo</h3>`);
+  tableCard.appendChild(ScorecardGrid(match, seleccionados.map(r=>r.p)));
+  wrap.appendChild(tableCard);
+
+  const resumenRows = seleccionados.map(row=>`<tr>
+    <td>${row.p.name}${row.p.isMaster?' 👑':''}</td>
+    <td>${row.extra.strokes}</td>
+    <td class="${diffClass(row.diff)}" style="font-weight:700">${fmtDiff(row.diff)}</td>
+  </tr>`).join('');
+  wrap.appendChild(card(`<table class="results-table">
+    <thead><tr><th>Jugador</th><th>Golpes totales</th><th>Resultado</th></tr></thead>
+    <tbody>${resumenRows}</tbody></table>`));
+
+  const evoCard = card(`<h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0 0 8px;color:var(--dorado-claro);">Evolución en la partida</h3><div class="chart-wrap"><canvas id="compareChart" height="180"></canvas></div>`);
+  wrap.appendChild(evoCard);
+  const posSeries = positionsPerHole(match);
+  const palette = ['#c9a24b','#3fa66b','#e0574a','#6ab7ff','#d78be0','#f2c14e','#8fd3c7','#f78ca0'];
+  const labels = Array.from({length:match.holes}, (_,i)=>'H'+(i+1));
+  const datasets = seleccionados.map((row,idx)=>{
+    const series = posSeries[row.p.id] || [];
+    const dataMap = {}; series.forEach(s=> dataMap[s.hole]=s.pos);
+    return { label:row.p.name, data: labels.map((_,i)=> dataMap[i+1] ?? null), borderColor: palette[idx%palette.length],
+      backgroundColor:'transparent', spanGaps:true, tension:.3, pointRadius:2.5 };
+  });
+  requestAnimationFrame(()=>{
+    const ctx = evoCard.querySelector('#compareChart').getContext('2d');
+    new Chart(ctx, { type:'line', data:{labels, datasets}, options:{
+      scales:{ y:{ reverse:true, ticks:{stepSize:1, color:'#f3efe2'}, grid:{color:'rgba(255,255,255,.06)'} },
+        x:{ ticks:{color:'#f3efe2'}, grid:{display:false} } },
+      plugins:{ legend:{labels:{color:'#f3efe2', boxWidth:10, font:{size:11}}} } }
+    });
+  });
+
+  return wrap;
+}
+
+function DetalleJugador(match, ranked){
+  const wrap = document.createElement('div');
+  const sel = el(`<select class="player-select" id="playerSel"></select>`);
+  ranked.forEach((row,idx)=> sel.appendChild(el(`<option value="${row.p.id}">${idx+1}. ${row.p.name}</option>`)));
+  wrap.appendChild(sel);
+  const cont = el(`<div id="detCont"></div>`);
+  wrap.appendChild(cont);
+  function paint(pid){
+    const row = ranked.find(r=>r.p.id===pid) || ranked[0];
+    const p = row.p;
+    const cells = p.holes.map((h,i)=> `<div class="hs-cell filled" style="min-width:34px;">${h!==null&&h!==undefined?h:'-'}<span class="n">${i+1}</span></div>`).join('');
+    cont.innerHTML = '';
+    cont.appendChild(card(`
+      <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px;">
+        <div class="avatar-circle" style="width:56px;height:56px;font-size:18px;">${p.avatar?`<img src="${p.avatar}">`:initials(p.name)}</div>
+        <div>
+          <div style="font-weight:800;font-size:16px;">${p.name}</div>
+          <div class="p-sub">Hándicap ${p.hcp} · Hándicap de campo ${p.hcpCampo}</div>
+        </div>
+      </div>
+      <div class="holes-strip">${cells}</div>
+      <div class="two-col" style="margin-top:16px;">
+        <div><label>Golpes totales</label><div class="hole-number" style="font-size:34px;">${row.extra.strokes}</div></div>
+        <div><label>Resultado (vs par)</label><div class="hole-number ${diffClass(row.diff)}" style="font-size:34px;">${fmtDiff(row.diff)}</div></div>
+      </div>
+    `));
+  }
+  sel.onchange = ()=> paint(sel.value);
+  paint(ranked[0].p.id);
+
+  // evolución individual
+  const evoCard = card(`<h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0 0 8px;color:var(--dorado-claro);">Evolución en la partida</h3><div class="chart-wrap"><canvas id="playerChart" height="160"></canvas></div><div id="playerInsight"></div>`);
+  wrap.appendChild(evoCard);
+  const posSeries = positionsPerHole(match);
+  function paintChart(pid){
+    const data = posSeries[pid] || [];
+    const ctx = evoCard.querySelector('#playerChart').getContext('2d');
+    if (evoCard._chart) evoCard._chart.destroy();
+    evoCard._chart = new Chart(ctx, {
+      type:'line',
+      data:{ labels:data.map(d=>'H'+d.hole), datasets:[{ label:'Posición', data:data.map(d=>d.pos),
+        borderColor:'#c9a24b', backgroundColor:'rgba(201,162,75,.15)', tension:.3, pointRadius:3, fill:true }]},
+      options:{ scales:{ y:{ reverse:true, ticks:{stepSize:1, color:'#f3efe2'}, grid:{color:'rgba(255,255,255,.06)'} },
+        x:{ ticks:{color:'#f3efe2'}, grid:{display:false} } },
+        plugins:{ legend:{display:false} } }
+    });
+    // mejor / peor hoyo (asumiendo par uniforme = par total / nº hoyos)
+    const p = match.players.find(pp=>pp.id===pid);
+    const parHoyo = match.par / match.holes;
+    let best=null, worst=null;
+    p.holes.forEach((h,i)=>{ if(h===null||h===undefined) return; const rel = h - parHoyo;
+      if(best===null || rel<best.rel) best={i,rel,h};
+      if(worst===null || rel>worst.rel) worst={i,rel,h}; });
+    const insight = evoCard.querySelector('#playerInsight');
+    insight.innerHTML='';
+    if (best) insight.appendChild(el(`<div class="insight-card">🟢 Su mejor hoyo relativo fue el <b>hoyo ${best.i+1}</b> (${best.h} golpes).</div>`));
+    if (worst) insight.appendChild(el(`<div class="insight-card">🔴 Su hoyo más costoso fue el <b>hoyo ${worst.i+1}</b> (${worst.h} golpes).</div>`));
+  }
+  sel.addEventListener('change', ()=>paintChart(sel.value));
+  paintChart(ranked[0].p.id);
+  return wrap;
+}
+
+/* ---------------- modal genérico para ampliar un gráfico ---------------- */
+function openChartModal(title, type, data, options){
+  const bg = el(`<div class="close-modal-bg">
+    <div class="card close-modal" style="max-width:900px;">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h2 class="title" style="font-size:24px;">${title}</h2>
+        <button class="btn btn-outline" id="btnCloseChart">Cerrar ✕</button>
+      </div>
+      <div class="chart-wrap"><canvas id="modalChart" height="110"></canvas></div>
+    </div>
+  </div>`);
+  document.body.appendChild(bg);
+  const ctx = bg.querySelector('#modalChart').getContext('2d');
+  const bigChart = new Chart(ctx, { type, data, options });
+  bg.querySelector('#btnCloseChart').onclick = ()=>{ bigChart.destroy(); bg.remove(); };
+  bg.addEventListener('click', (e)=>{ if (e.target===bg){ bigChart.destroy(); bg.remove(); } });
+}
+
+function AnalisisPartida(match, ranked){
+  const wrap = document.createElement('div');
+  const posSeries = positionsPerHole(match);
+
+  // gráfico de evolución de todos
+  const chartCard = card(`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0;color:var(--dorado-claro);">Evolución del ranking por hoyo</h3>
+      <button class="refresh-btn" id="btnAmpliar">⛶ Ampliar</button>
+    </div>
+    <div class="chart-wrap"><canvas id="matchChart" height="180"></canvas></div>`);
+  wrap.appendChild(chartCard);
+  const palette = ['#c9a24b','#3fa66b','#e0574a','#6ab7ff','#d78be0','#f2c14e','#8fd3c7','#f78ca0'];
+  const labels = Array.from({length:match.holes}, (_,i)=>'H'+(i+1));
+  const datasets = match.players.map((p,idx)=>{
+    const series = posSeries[p.id];
+    const dataMap = {}; series.forEach(s=> dataMap[s.hole]=s.pos);
+    return { label:p.name, data: labels.map((_,i)=> dataMap[i+1] ?? null), borderColor: palette[idx%palette.length],
+      backgroundColor:'transparent', spanGaps:true, tension:.3, pointRadius:2.5 };
+  });
+  const matchChartOptions = { scales:{ y:{ reverse:true, ticks:{stepSize:1, color:'#f3efe2'}, grid:{color:'rgba(255,255,255,.06)'} },
+        x:{ ticks:{color:'#f3efe2'}, grid:{display:false} } },
+        plugins:{ legend:{labels:{color:'#f3efe2', boxWidth:10, font:{size:11}}} } };
+  requestAnimationFrame(()=>{
+    const ctx = chartCard.querySelector('#matchChart').getContext('2d');
+    new Chart(ctx, { type:'line', data:{labels, datasets}, options: matchChartOptions });
+  });
+  chartCard.querySelector('#btnAmpliar').onclick = ()=>{
+    openChartModal('Evolución del ranking por hoyo', 'line', {labels, datasets}, matchChartOptions);
+  };
+
+  // narrativa
+  const leaderCount = {}; let totalHolesData=0; const leadersSeq=[];
+  for (let h=1; h<=match.holes; h++){
+    const atHole = match.players.map(p=>{ const s = posSeries[p.id].find(x=>x.hole===h); return s? {p, pos:s.pos} : null; }).filter(Boolean);
+    if (atHole.length===0) continue;
+    totalHolesData++;
+    const leader = atHole.find(a=>a.pos===1);
+    if (leader){ leaderCount[leader.p.id] = (leaderCount[leader.p.id]||0)+1; leadersSeq.push(leader.p.id); }
+  }
+  let dominIns = '';
+  if (totalHolesData>0){
+    const topLeaderId = Object.entries(leaderCount).sort((a,b)=>b[1]-a[1])[0];
+    if (topLeaderId){
+      const leaderName = match.players.find(p=>p.id===topLeaderId[0]).name;
+      const pct = topLeaderId[1]/totalHolesData;
+      if (pct >= 0.6){
+        dominIns = `<b>${leaderName}</b> dominó la partida, liderando el ranking en ${topLeaderId[1]} de ${totalHolesData} hoyos.`;
+      } else {
+        const distinctLeaders = new Set(leadersSeq).size;
+        dominIns = distinctLeaders >= 3
+          ? `Partida muy reñida: el liderato cambió de manos entre ${distinctLeaders} jugadores distintos a lo largo de la ronda.`
+          : `Pelea ajustada por las primeras posiciones, sin un dominador claro.`;
+      }
+    }
+  }
+  // margen final entre 1º y 2º
+  let margenIns = '';
+  if (ranked.length>=2){
+    const gap = ranked[1].extra.strokes - ranked[1].p.hcpCampo - ranked[0].extra.strokes + ranked[0].p.hcpCampo;
+    const gapAbs = Math.abs(ranked[1].diff - ranked[0].diff);
+    margenIns = gapAbs<=1
+      ? `El primer y segundo puesto se decidieron por una diferencia mínima de <b>${gapAbs} golpe(s)</b> netos.`
+      : `El primer puesto se resolvió con una diferencia clara de <b>${gapAbs} golpes</b> netos sobre el segundo.`;
+  }
+  // mayor subida (posición en su primer hoyo con datos vs posición final)
+  let subidaIns = '';
+  let maxDelta = -Infinity, subidaP=null;
+  match.players.forEach(p=>{
+    const series = posSeries[p.id];
+    if (series.length<2) return;
+    const delta = series[0].pos - series[series.length-1].pos;
+    if (delta > maxDelta){ maxDelta = delta; subidaP = p; }
+  });
+  if (subidaP && maxDelta>0){
+    subidaIns = `<b>${subidaP.name}</b> firmó la mayor remontada de la partida, escalando ${maxDelta} puesto(s) en el ranking.`;
+  }
+
+  const insightsCard = card(`
+    <h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Cómo se vivió la partida</h3>
+    ${dominIns?`<div class="insight-card">🏆 ${dominIns}</div>`:''}
+    ${margenIns?`<div class="insight-card">⚔️ ${margenIns}</div>`:''}
+    ${subidaIns?`<div class="insight-card">🚀 ${subidaIns}</div>`:''}
+  `);
+  wrap.appendChild(insightsCard);
+
+  // distribución por rango de resultado
+  const buckets = [
+    {label:'Bajo par', test:d=>d<0},
+    {label:'Par (E)', test:d=>d===0},
+    {label:'+1 a +5', test:d=>d>=1&&d<=5},
+    {label:'+6 a +10', test:d=>d>=6&&d<=10},
+    {label:'Más de +10', test:d=>d>10},
+  ];
+  const counts = buckets.map(b=> ranked.filter(r=>b.test(r.diff)).length);
+  const distCard = card(`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0;color:var(--dorado-claro);">Distribución de resultados</h3>
+      <button class="refresh-btn" id="btnAmpliarDist">⛶ Ampliar</button>
+    </div>
+    <div class="chart-wrap"><canvas id="distChart" height="140"></canvas></div>`);
+  wrap.appendChild(distCard);
+  const distData = { labels:buckets.map(b=>b.label), datasets:[{label:'Jugadores', data:counts, backgroundColor:'#3fa66b'}]};
+  const distOptions = { scales:{ y:{ ticks:{stepSize:1, color:'#f3efe2'}, grid:{color:'rgba(255,255,255,.06)'} }, x:{ ticks:{color:'#f3efe2'}, grid:{display:false} } },
+        plugins:{legend:{display:false}} };
+  requestAnimationFrame(()=>{
+    const ctx = distCard.querySelector('#distChart').getContext('2d');
+    new Chart(ctx, { type:'bar', data:distData, options:distOptions });
+  });
+  distCard.querySelector('#btnAmpliarDist').onclick = ()=> openChartModal('Distribución de resultados', 'bar', distData, distOptions);
+
+  return wrap;
+}
+
+/* ---------------- sincronización entre pestañas ---------------- */
+window.addEventListener('storage', (e)=>{
+  if (e.key && e.key.startsWith('golf_match_') && CURRENT.code && e.key === 'golf_match_'+CURRENT.code){
+    render();
+  }
+});
+window.addEventListener('golf-local-update', ()=>{ /* ya se renderiza tras cada acción local */ });
+setInterval(()=>{
+  if ((CURRENT.screen==='play' || CURRENT.screen==='spectate') && CURRENT.code){
+    const cached = Store.getMatch(CURRENT.code);
+    if (cached && cached._airtableId){
+      pullAndMerge(CURRENT.code).then(()=> render()).catch(err=>console.error('Airtable poll:',err));
+    } else {
+      render();
+    }
+  }
+}, 6000);
+
+/* ---------------- semilla de datos de ejemplo: partida 2012 (cerrada) ---------------- */
+function seedDemoMatch(){
+  if (Store.matchExists('2012')) return;
+  const course = { id:'saler', name:'El Saler', img:'https://images.unsplash.com/photo-1694636507260-8b2428e3b738?w=800&q=80&auto=format&fit=crop' };
+  const names = ['Pablo P','Marisa G','Vicente R','Enrique T','Alfredo B','Carlos M','Javier S','Sonia L','Rafael N','Antonio D'];
+  const holes = 18, par = 72, parHoyo = par/holes;
+  let seed = 42;
+  function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; } // pseudo-aleatorio reproducible
+  const players = names.map((name,i)=>{
+    const hcp = Math.round((5 + rnd()*28)*10)/10;
+    const hcpCampo = hcpCampoFor({ranges:DEFAULT_HCP_RANGES}, hcp);
+    const holesArr = [];
+    for (let h=0; h<holes; h++){
+      const variacion = Math.floor(rnd()*5)-1; // -1..+3
+      holesArr.push(Math.max(2, Math.round(parHoyo)+variacion));
+    }
+    return {
+      id: uid(), name, hcp, hcpCampo,
+      avatar: `https://i.pravatar.cc/150?img=${i+11}`,
+      isMaster: i===0, holes: holesArr, currentHole: holes-1
+    };
+  });
+  const match = {
+    code:'2012', campoId:course.id, campoNombre:course.name, campoImagen:course.img,
+    holes, par, createdAt: Date.now()-1000*60*90, masterId: players[0].id,
+    players, status:'closed', closedAt: Date.now()-1000*60*10
+  };
+  Store.saveMatch(match);
+}
+seedDemoMatch();
+
+// si se accede mediante un enlace compartido (?code=XXXX), intenta abrir esa partida directamente
+(async function handleSharedLink(){
+  const params = new URLSearchParams(location.search);
+  const code = (params.get('code')||'').trim();
+  if (code){
+    const ok = await attemptJoinCode(code, null);
+    if (!ok) CURRENT = {screen:'unirse1', data:{prefillCode:code, prefillError:'No se encontró ninguna partida con el código '+code+'.'}};
+    render();
+  }
+})();
+
+render();
+</script>
+</body>
+</html>
