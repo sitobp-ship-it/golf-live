@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
@@ -179,8 +180,8 @@ input.code-input{text-align:center;letter-spacing:10px;font-size:26px;font-famil
 .score-side .big-num{font-family:'Bebas Neue';font-size:88px;line-height:1;color:var(--crema);}
 .strokes-input-wrap{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;}
 .stepper-btn{width:48px;height:48px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--gris-linea);color:var(--crema);font-size:24px;cursor:pointer;}
-.strokes-display{font-family:'Bebas Neue';font-size:112px;width:120px;text-align:center;background:transparent;border:none;color:var(--crema);}
-@media (max-width:380px){ .strokes-display{font-size:92px;width:100px;} .score-side .big-num{font-size:72px;} }
+.strokes-display{font-family:'Bebas Neue';font-size:150px;width:150px;text-align:center;background:transparent;border:none;color:var(--crema);}
+@media (max-width:380px){ .strokes-display{font-size:120px;width:120px;} .score-side .big-num{font-size:72px;} }
 
 /* mensaje de resultado (par / birdie / bogey...) */
 .result-msg{font-size:14.5px;font-weight:700;margin:4px 0 14px;padding:10px 14px;border-radius:12px;min-height:18px;}
@@ -396,28 +397,58 @@ let savedProfile = null;
   }).catch(()=>{});
 })();
 
-/* historial de partidas de un usuario (por email), para la pantalla de inicio */
+/* historial de partidas de un usuario (por email), con datos enriquecidos
+   (golpes, hoyos, nº de jugadores) para la pantalla de inicio y el perfil */
 async function fetchUserHistory(email){
-  const { data: jugRows } = await sb.from('jugadores_partida').select('id, partida_code').eq('usuario_email', email);
+  const { data: jugRows } = await sb.from('jugadores_partida').select('id, partida_code, golpes').eq('usuario_email', email);
   const rows = jugRows || [];
   if (!rows.length) return [];
   const codes = [...new Set(rows.map(r=>r.partida_code))];
   await ensureCamposCache().catch(()=>{});
   const { data: partidasRows } = await sb.from('partidas').select('*').in('code', codes);
-  const playerIdByCode = {};
-  rows.forEach(r=>{ playerIdByCode[r.partida_code] = r.id; });
+  const { data: allPlayers } = await sb.from('jugadores_partida').select('partida_code').in('partida_code', codes);
+  const countByCode = {};
+  (allPlayers||[]).forEach(pl=>{ countByCode[pl.partida_code] = (countByCode[pl.partida_code]||0)+1; });
+  const rowByCode = {};
+  rows.forEach(r=>{ rowByCode[r.partida_code] = r; });
   return (partidasRows||[]).map(p=>{
     const campo = p.campo_id ? camposCache.byRecordId[p.campo_id] : null;
+    const jr = rowByCode[p.code];
+    const golpes = (jr && Array.isArray(jr.golpes)) ? jr.golpes.reduce((s,h)=>s+(h||0),0) : 0;
     return {
-      code: p.code, playerId: playerIdByCode[p.code],
+      code: p.code, playerId: jr ? jr.id : null,
       campoNombre: campo?campo.nombre:(p.campo_nombre_libre||'Otro campo'),
-      status: p.status,
+      status: p.status, holes: p.holes, par: p.par, modalidad: p.modalidad||'individual',
+      golpes, jugadores: countByCode[p.code]||0,
       createdAt: p.created_at ? new Date(p.created_at).getTime() : 0
     };
   }).sort((a,b)=>{
     if ((a.status==='open') !== (b.status==='open')) return a.status==='open' ? -1 : 1;
     return b.createdAt - a.createdAt;
   });
+}
+
+/* estadisticas de un usuario a partir de su historial: campos mas jugados,
+   total de partidas cerradas y distribucion de posiciones finales conseguidas */
+async function computeUserStats(email, history){
+  const closed = history.filter(h=>h.status==='closed');
+  const porCampo = {};
+  closed.forEach(h=>{ porCampo[h.campoNombre] = (porCampo[h.campoNombre]||0)+1; });
+  const posiciones = {};
+  for (const h of closed){
+    const match = await fetchMatchFromSupabase(h.code).catch(()=>null);
+    if (!match) continue;
+    let idx = -1;
+    if (match.modalidad==='parejas'){
+      const ranked = rankParejas(match, match.players);
+      idx = ranked.findIndex(r=> r.members.some(m=>m.usuarioEmail===email));
+    } else {
+      const ranked = rankPlayers(match, match.players, false);
+      idx = ranked.findIndex(r=> r.p.usuarioEmail===email);
+    }
+    if (idx>=0) posiciones[idx+1] = (posiciones[idx+1]||0)+1;
+  }
+  return { totalPartidas: closed.length, porCampo, posiciones };
 }
 const homeHistoryState = { email:null, history:null, loading:false };
 function ensureHomeHistory(email){
@@ -759,7 +790,7 @@ function render(){
       crearRecorrido: ScreenCrearRecorrido, crearCampoLibre: ScreenCrearCampoLibre,
       crear2: ScreenCrear2, crear3: ScreenCrear3,
       unirse1: ScreenUnirse1, unirse2: ScreenUnirse2, play: ScreenPlay, spectate: ScreenSpectate,
-      agruparParejas: ScreenAgruparParejas,
+      agruparParejas: ScreenAgruparParejas, perfil: ScreenPerfil,
       results: ScreenResults, consulta: ScreenResults
     };
     const fn = screens[CURRENT.screen] || ScreenHome;
@@ -803,11 +834,13 @@ function ScreenHome(){
     <div class="stack">
       <button class="btn btn-primary btn-block btn-lg" id="btnCrear">Crear partida</button>
       <button class="btn btn-outline btn-block btn-lg" id="btnUnirse">Unirse a partida</button>
+      <button class="btn btn-outline btn-block" id="btnPerfil">👤 Mi perfil</button>
     </div>
     <div id="historyArea"></div>
   </div></div>`);
   wrap.querySelector('#btnCrear').onclick = ()=>{ CURRENT = {screen:'crearNombre', data:{}}; render(); };
   wrap.querySelector('#btnUnirse').onclick = ()=>{ CURRENT = {screen:'unirse1', data:{}}; render(); };
+  wrap.querySelector('#btnPerfil').onclick = ()=>{ CURRENT = {screen:'perfil'}; render(); };
 
   const email = Store.getProfileEmail();
   if (email){
@@ -846,6 +879,304 @@ function openHistoryMatch(item){
   }).catch(err=>console.error('Historial:',err));
 }
 
+/* ================= MI PERFIL: editar datos, historial y estadisticas ================= */
+let perfilTab = 'editar';
+const perfilState = { email:null, profile:null, history:null, stats:null, historyLoading:false, statsLoading:false };
+
+function ScreenPerfil(){
+  const wrap = document.createElement('div');
+  const topBar = el(`<div class="row" style="margin-bottom:10px;"><button class="btn btn-outline" id="btnMenu">← Menú principal</button></div>`);
+  topBar.querySelector('#btnMenu').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  wrap.appendChild(topBar);
+
+  const email = CURRENT.perfilEmail || Store.getProfileEmail();
+  if (!email){
+    wrap.appendChild(PerfilEmailGate());
+    return wrap;
+  }
+  if (perfilState.email !== email){
+    perfilState.email = email; perfilState.profile = null; perfilState.history = null; perfilState.stats = null;
+    perfilTab = 'editar';
+  }
+  if (!perfilState.profile){
+    if (savedProfile && savedProfile.email===email){
+      perfilState.profile = savedProfile;
+    } else if (CURRENT.perfilNuevo){
+      perfilState.profile = { email, nombre:'', hcp:null, avatar_url:null };
+    } else {
+      sb.from('usuarios').select('*').eq('email', email).limit(1).then(({data})=>{
+        perfilState.profile = (data && data.length) ? data[0] : { email, nombre:'', hcp:null, avatar_url:null };
+        if (data && data.length) savedProfile = data[0];
+        if (CURRENT.screen==='perfil') render();
+      });
+      wrap.appendChild(card(`<p class="sub" style="margin:0;">Cargando tu perfil…</p>`));
+      return wrap;
+    }
+  }
+
+  wrap.appendChild(card(`<h2 class="title">👤 Mi perfil</h2><p class="sub">${email}</p>`));
+
+  const tabs = el(`<div class="tabs">
+    <button class="tab-btn ${perfilTab==='editar'?'active':''}" data-t="editar">Editar perfil</button>
+    <button class="tab-btn ${perfilTab==='historial'?'active':''}" data-t="historial">Historial</button>
+    <button class="tab-btn ${perfilTab==='estadisticas'?'active':''}" data-t="estadisticas">Estadísticas</button>
+  </div>`);
+  tabs.querySelectorAll('.tab-btn').forEach(b=> b.onclick = ()=>{ perfilTab=b.dataset.t; render(); });
+  wrap.appendChild(tabs);
+
+  if (perfilTab==='editar') wrap.appendChild(PerfilEditar(email));
+  if (perfilTab==='historial') wrap.appendChild(PerfilHistorial(email));
+  if (perfilTab==='estadisticas') wrap.appendChild(PerfilEstadisticas(email));
+
+  return wrap;
+}
+
+function PerfilEmailGate(){
+  const box = card(`<h2 class="title">👤 Mi perfil</h2>
+    <p class="sub">Escribe tu email para ver o crear tu perfil: tus datos, tu historial de partidas y tus estadísticas.</p>
+    <label>Tu email</label>
+    <div class="row"><input type="text" id="gateEmail" placeholder="tucorreo@ejemplo.com" style="flex:1;" value="${savedProfile?savedProfile.email:''}"><button class="btn btn-primary" id="gateBtn">Buscar</button></div>
+    <div id="gateMsg" style="margin-top:10px;"></div>`);
+  const msg = box.querySelector('#gateMsg');
+  async function doSearch(){
+    const email = box.querySelector('#gateEmail').value.trim();
+    if (!email){ msg.innerHTML = '<p class="error-msg">Escribe un email.</p>'; return; }
+    msg.innerHTML = '<p class="sub">Buscando…</p>';
+    const { data } = await sb.from('usuarios').select('*').eq('email', email).limit(1);
+    if (data && data.length){
+      savedProfile = data[0];
+      Store.setProfileEmail(email);
+      CURRENT = {screen:'perfil', perfilEmail:email};
+      render();
+    } else {
+      msg.innerHTML = '';
+      msg.appendChild(el(`<p class="error-msg">No hemos encontrado ningún perfil con ese email.</p>`));
+      const btnNuevo = el(`<button class="btn btn-outline btn-block" style="margin-top:6px;">Crear perfil nuevo con este email</button>`);
+      btnNuevo.onclick = ()=>{ CURRENT = {screen:'perfil', perfilEmail:email, perfilNuevo:true}; render(); };
+      msg.appendChild(btnNuevo);
+    }
+  }
+  box.querySelector('#gateBtn').onclick = doSearch;
+  box.querySelector('#gateEmail').addEventListener('keydown', e=>{ if (e.key==='Enter') doSearch(); });
+  return box;
+}
+
+function PerfilEditar(email){
+  const p = perfilState.profile;
+  let avatar = p.avatar_url || null;
+  const box = card(`
+    <label>Tu nombre</label>
+    <input type="text" id="pfNombre" value="${p.nombre||''}">
+    <div style="height:14px"></div>
+    <label>Tu hándicap (índice)</label>
+    <input type="number" step="0.1" id="pfHcp" value="${p.hcp!=null?p.hcp:''}">
+    <div style="height:16px"></div>
+    <label>Foto de perfil</label>
+    <div class="avatar-row">
+      <div class="avatar-circle" id="pfAvatarPreview">${avatar?`<img src="${avatar}">`:initials(p.nombre||'?')}</div>
+      <div class="avatar-opts">
+        <button class="btn btn-outline" id="pfCam">📷 Cámara</button>
+        <button class="btn btn-outline" id="pfGal">🖼️ Galería</button>
+        <input type="file" accept="image/*" capture="environment" id="pfFileCam" class="hidden">
+        <input type="file" accept="image/*" id="pfFileGal" class="hidden">
+      </div>
+    </div>
+    <div class="error-msg" id="pfErr"></div>
+    <button class="btn btn-gold btn-block" id="pfSave" style="margin-top:14px;">Guardar cambios</button>
+  `);
+  function setAvatar(url){ avatar=url; box.querySelector('#pfAvatarPreview').innerHTML = `<img src="${url}">`; }
+  box.querySelector('#pfCam').onclick = ()=> box.querySelector('#pfFileCam').click();
+  box.querySelector('#pfGal').onclick = ()=> box.querySelector('#pfFileGal').click();
+  [box.querySelector('#pfFileCam'), box.querySelector('#pfFileGal')].forEach(inp=>{
+    inp.onchange = (ev)=>{ const f=ev.target.files[0]; if(!f) return;
+      const r = new FileReader(); r.onload=()=>setAvatar(r.result); r.readAsDataURL(f); };
+  });
+  box.querySelector('#pfSave').onclick = async ()=>{
+    const nombre = box.querySelector('#pfNombre').value.trim();
+    const hcp = parseFloat(box.querySelector('#pfHcp').value);
+    if (!nombre){ box.querySelector('#pfErr').textContent='Escribe tu nombre.'; return; }
+    if (isNaN(hcp)){ box.querySelector('#pfErr').textContent='Introduce tu hándicap.'; return; }
+    const btn = box.querySelector('#pfSave');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    box.querySelector('#pfErr').textContent = '';
+    try {
+      let avatarUrl = avatar;
+      if (avatar && avatar.startsWith('data:')) avatarUrl = await uploadAvatar(avatar).catch(()=>avatar);
+      const { data, error } = await sb.from('usuarios').upsert({ email, nombre, hcp, avatar_url:avatarUrl }).select();
+      if (error) throw error;
+      perfilState.profile = data[0];
+      savedProfile = data[0];
+      Store.setProfileEmail(email);
+      btn.textContent = '✓ Guardado';
+      setTimeout(()=>{ render(); }, 700);
+    } catch(err){
+      console.error(err);
+      box.querySelector('#pfErr').textContent = 'No se pudo guardar (revisa tu conexión).';
+      btn.disabled = false; btn.textContent = 'Guardar cambios';
+    }
+  };
+  return box;
+}
+
+function PerfilHistorial(email){
+  const wrap = document.createElement('div');
+  if (perfilState.email===email && perfilState.history){
+    const h = perfilState.history;
+    if (!h.length){
+      wrap.appendChild(card(`<p class="sub" style="margin:0;">Todavía no hay partidas asociadas a este perfil.</p>`));
+      return wrap;
+    }
+    const box = card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Tus partidas (${h.length})</h3><div class="history-list"></div>`);
+    const list = box.querySelector('.history-list');
+    h.forEach(item=>{
+      const row = el(`<div class="history-item">
+        <div class="hleft">
+          <div class="hname">Partida ${item.code} — ${item.campoNombre}</div>
+          <div class="hsub">${item.status==='open'?'🟢 En curso':'🔒 Cerrada'} · ${item.golpes||0} golpes en ${item.holes} hoyos · ${item.jugadores} jugador(es)${item.modalidad==='parejas'?' · Parejas':''}</div>
+        </div>
+        <div>›</div>
+      </div>`);
+      row.onclick = ()=> openHistoryMatch(item);
+      list.appendChild(row);
+    });
+    wrap.appendChild(box);
+    return wrap;
+  }
+  wrap.appendChild(card(`<p class="sub" style="margin:0;">Cargando historial…</p>`));
+  if (!perfilState.historyLoading){
+    perfilState.historyLoading = true;
+    fetchUserHistory(email).then(history=>{
+      perfilState.history = history; perfilState.historyLoading = false;
+      if (CURRENT.screen==='perfil') render();
+    }).catch(()=>{ perfilState.historyLoading=false; });
+  }
+  return wrap;
+}
+
+function PerfilEstadisticas(email){
+  const wrap = document.createElement('div');
+  if (perfilState.email===email && perfilState.stats){
+    const stats = perfilState.stats;
+    const campoRows = Object.entries(stats.porCampo).sort((a,b)=>b[1]-a[1]);
+    const posRows = Object.entries(stats.posiciones).map(([k,v])=>[parseInt(k),v]).sort((a,b)=>a[0]-b[0]);
+
+    wrap.appendChild(card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Resumen</h3>
+      <div class="two-col">
+        <div><label>Partidas jugadas</label><div class="hole-number" style="font-size:34px;">${stats.totalPartidas}</div></div>
+        <div><label>Campos distintos</label><div class="hole-number" style="font-size:34px;">${campoRows.length}</div></div>
+      </div>`));
+
+    if (stats.totalPartidas===0){
+      wrap.appendChild(card(`<p class="sub" style="margin:0;">Todavía no hay partidas cerradas para calcular estadísticas.</p>`));
+      return wrap;
+    }
+
+    const campoCard = card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Campos más jugados</h3><div class="chart-wrap"><canvas id="campoChart" height="140"></canvas></div>`);
+    wrap.appendChild(campoCard);
+    requestAnimationFrame(()=>{
+      const ctx = campoCard.querySelector('#campoChart').getContext('2d');
+      new Chart(ctx, { type:'bar', data:{ labels:campoRows.map(r=>r[0]), datasets:[{ label:'Partidas', data:campoRows.map(r=>r[1]), backgroundColor:'#c9a24b' }] },
+        options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#f3efe2', stepSize:1}, grid:{color:'rgba(255,255,255,.06)'}}, y:{ticks:{color:'#f3efe2'}, grid:{display:false}} } } });
+    });
+
+    const posCard = card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Posiciones finales conseguidas</h3><div class="chart-wrap"><canvas id="posChart" height="140"></canvas></div>`);
+    wrap.appendChild(posCard);
+    requestAnimationFrame(()=>{
+      const ctx = posCard.querySelector('#posChart').getContext('2d');
+      new Chart(ctx, { type:'bar', data:{ labels:posRows.map(r=>'#'+r[0]), datasets:[{ label:'Veces', data:posRows.map(r=>r[1]), backgroundColor:'#3fa66b' }] },
+        options:{ plugins:{legend:{display:false}}, scales:{ y:{ticks:{color:'#f3efe2', stepSize:1}, grid:{color:'rgba(255,255,255,.06)'}}, x:{ticks:{color:'#f3efe2'}, grid:{display:false}} } } });
+    });
+
+    const btnPdf = el(`<button class="btn btn-gold btn-block" style="margin-top:6px;">📄 Descargar informe de estadísticas (PDF)</button>`);
+    const btnWa = el(`<button class="btn btn-outline btn-block" style="margin-top:10px;">📲 Enviar por WhatsApp</button>`);
+    btnPdf.onclick = ()=>{
+      const doc = buildStatsPDF(email, perfilState.profile, stats);
+      window.open(doc.output('bloburl'), '_blank');
+    };
+    btnWa.onclick = async ()=>{
+      const doc = buildStatsPDF(email, perfilState.profile, stats);
+      const blob = doc.output('blob');
+      const file = new File([blob], `golf-live-estadisticas-${email}.pdf`, {type:'application/pdf'});
+      if (navigator.canShare && navigator.canShare({files:[file]})){
+        try { await navigator.share({files:[file], title:'Mis estadísticas', text:'⛳ Mis estadísticas en Golf Live'}); }
+        catch(e){ /* el usuario canceló el share */ }
+      } else {
+        const a = document.createElement('a');
+        a.href = doc.output('bloburl'); a.download = file.name; a.click();
+        alert('Tu navegador no permite compartir el archivo directamente: se ha descargado el PDF para que lo envíes por WhatsApp a mano.');
+      }
+    };
+    wrap.appendChild(btnPdf);
+    wrap.appendChild(btnWa);
+    return wrap;
+  }
+  wrap.appendChild(card(`<p class="sub" style="margin:0;">Calculando estadísticas… (puede tardar unos segundos si tienes muchas partidas)</p>`));
+  if (!perfilState.statsLoading){
+    perfilState.statsLoading = true;
+    const historyPromise = perfilState.history ? Promise.resolve(perfilState.history) : fetchUserHistory(email);
+    historyPromise.then(history=>{
+      perfilState.history = history;
+      return computeUserStats(email, history);
+    }).then(stats=>{
+      perfilState.stats = stats; perfilState.statsLoading = false;
+      if (CURRENT.screen==='perfil') render();
+    }).catch(()=>{ perfilState.statsLoading = false; });
+  }
+  return wrap;
+}
+
+function buildStatsPDF(email, profile, stats){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const verdeOscuro = [13,58,38], verdeCampo = [21,92,57], dorado = [201,162,75], crema = [243,239,226];
+
+  doc.setFillColor(...verdeOscuro);
+  doc.rect(0,0,pageW,38,'F');
+  doc.setFillColor(...dorado);
+  doc.rect(0,38,pageW,1.4,'F');
+  doc.setTextColor(...dorado);
+  doc.setFont('helvetica','bold'); doc.setFontSize(22);
+  doc.text('GOLF LIVE', 14, 17);
+  doc.setTextColor(...crema);
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text('Informe de estadísticas', 14, 25);
+  doc.setFontSize(9);
+  doc.text(`${profile.nombre||email}   ·   ${email}`, 14, 32);
+  doc.setTextColor(20,20,20);
+
+  let y = 50;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('Resumen', 14, y); y+=8;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(`Partidas jugadas (cerradas): ${stats.totalPartidas}`, 14, y); y+=7;
+  doc.text(`Campos distintos jugados: ${Object.keys(stats.porCampo).length}`, 14, y); y+=10;
+
+  const campoRows = Object.entries(stats.porCampo).sort((a,b)=>b[1]-a[1]);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('Campos más jugados', 14, y); y+=4;
+  doc.autoTable({ startY:y, head:[['Campo','Partidas']], body: campoRows,
+    theme:'striped', headStyles:{ fillColor:verdeCampo, textColor:[255,255,255] }, styles:{fontSize:9.5}, margin:{left:14,right:14} });
+  y = doc.lastAutoTable.finalY + 10;
+
+  const posRows = Object.entries(stats.posiciones).map(([k,v])=>[parseInt(k),v]).sort((a,b)=>a[0]-b[0]).map(([k,v])=>[`Posición ${k}`,v]);
+  if (y>250){ doc.addPage(); y=20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('Posiciones finales conseguidas', 14, y); y+=4;
+  doc.autoTable({ startY:y, head:[['Posición','Veces']], body: posRows,
+    theme:'striped', headStyles:{ fillColor:verdeCampo, textColor:[255,255,255] }, styles:{fontSize:9.5}, margin:{left:14,right:14} });
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(140,140,140);
+    doc.text('Golf Live · Marcador en tiempo real', 14, pageH-8);
+    doc.text(`Página ${i} de ${pageCount}`, pageW-14, pageH-8, {align:'right'});
+  }
+  return doc;
+}
+
 /* ================= CREAR 1a: nombre del master ================= */
 function ScreenCrearNombre(){
   const d = CURRENT.data;
@@ -853,6 +1184,7 @@ function ScreenCrearNombre(){
     <div class="steps"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
     <h2 class="title">Nueva partida</h2>
     <p class="sub">Eres el master de la partida. ¿Cómo te llamas?</p>
+    <div id="lookupArea"></div>
     <label>Tu nombre</label>
     <input type="text" id="masterName" placeholder="Ej. Vicente" value="${d.masterName || (savedProfile?savedProfile.nombre:'') || ''}">
     <div class="error-msg" id="err"></div>
@@ -861,6 +1193,13 @@ function ScreenCrearNombre(){
       <button class="btn btn-primary btn-block" id="btnNext">Aceptar</button>
     </div>
   `);
+  ProfileLookup(wrap.querySelector('#lookupArea'), (row)=>{
+    savedProfile = row;
+    Store.setProfileEmail(row.email);
+    d.masterName = row.nombre;
+    CURRENT = {screen:'crearNombre', data:d};
+    render();
+  });
   const input = wrap.querySelector('#masterName');
   wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
   wrap.querySelector('#btnNext').onclick = ()=>{
@@ -1203,6 +1542,43 @@ function ProfileSaveToggle(container){
   };
 }
 
+/* enlace + email para identificarse como jugador ya registrado: busca en "usuarios"
+   y, si lo encuentra, rellena automáticamente nombre/hándicap/avatar aguas abajo
+   (vía la variable global savedProfile, que ya usan ScreenCrearNombre/Crear3/Unirse2) */
+function ProfileLookup(container, onFound){
+  const box = el(`<div style="margin-bottom:14px;">
+    <a href="javascript:void(0)" id="lookupToggle" style="color:var(--dorado-claro);font-size:13px;text-decoration:underline;">¿Ya tienes perfil? Identifícate con tu email</a>
+    <div id="lookupBox" class="hidden" style="margin-top:10px;">
+      <label>Tu email</label>
+      <div class="row">
+        <input type="text" id="lookupEmail" placeholder="tucorreo@ejemplo.com" style="flex:1;">
+        <button class="btn btn-outline" id="lookupBtn" style="white-space:nowrap;">Buscar</button>
+      </div>
+      <div id="lookupMsg" style="margin-top:8px;font-size:13px;"></div>
+    </div>
+  </div>`);
+  container.appendChild(box);
+  const toggle = box.querySelector('#lookupToggle');
+  const lookupBox = box.querySelector('#lookupBox');
+  toggle.onclick = ()=>{ lookupBox.classList.toggle('hidden'); };
+  const msg = box.querySelector('#lookupMsg');
+  box.querySelector('#lookupBtn').onclick = async ()=>{
+    const email = box.querySelector('#lookupEmail').value.trim();
+    if (!email){ msg.textContent = 'Escribe tu email.'; msg.className='error-msg'; return; }
+    msg.textContent = 'Buscando…'; msg.className='sub';
+    const { data, error } = await sb.from('usuarios').select('*').eq('email', email).limit(1);
+    if (error || !data || !data.length){
+      msg.textContent = 'No hemos encontrado ningún perfil con ese email. Puedes seguir y guardarlo como nuevo más adelante.';
+      msg.className = 'error-msg';
+      return;
+    }
+    msg.textContent = `✓ Hemos encontrado tu perfil, ${data[0].nombre}.`;
+    msg.className = 'sub';
+    onFound(data[0]);
+  };
+  return box;
+}
+
 /* ================= CREAR 3: datos del master como jugador + confirmar ================= */
 function ScreenCrear3(){
   const d = CURRENT.data;
@@ -1271,6 +1647,13 @@ function ScreenCrear3(){
       let avatarUrl = null;
       if (d.masterAvatar) avatarUrl = d.masterAvatar.startsWith('data:') ? await uploadAvatar(d.masterAvatar).catch(()=>null) : d.masterAvatar;
 
+      const profileEmail = profile.wanted ? profile.email : null;
+      if (profileEmail){
+        const { error: errProfile } = await sb.from('usuarios').upsert({ email:profileEmail, nombre:d.masterName, hcp, avatar_url:avatarUrl });
+        if (errProfile) throw errProfile;
+        Store.setProfileEmail(profileEmail);
+      }
+
       const { data: partidaRows, error: errPartida } = await sb.from('partidas').insert({
         code,
         campo_id: d.campoRecordId || null,
@@ -1280,7 +1663,6 @@ function ScreenCrear3(){
       }).select();
       if (errPartida) throw errPartida;
 
-      const profileEmail = profile.wanted ? profile.email : null;
       const { data: jugadorRows, error: errJugador } = await sb.from('jugadores_partida').insert({
         partida_code: code, nombre: d.masterName, hcp, hcp_campo: hcpCampo,
         avatar_url: avatarUrl, is_master: true, hoyo_actual: 0, golpes: new Array(d.holes).fill(null),
@@ -1288,11 +1670,6 @@ function ScreenCrear3(){
       }).select();
       if (errJugador) throw errJugador;
       const masterRec = jugadorRows[0];
-
-      if (profileEmail){
-        Store.setProfileEmail(profileEmail);
-        Sync.saveProfile(profileEmail, d.masterName, hcp, avatarUrl).catch(err=>console.error('Guardar perfil:',err));
-      }
 
       const master = {
         id: masterRec.id, name:d.masterName, hcp, hcpCampo, avatar:avatarUrl, isMaster:true,
@@ -1410,6 +1787,7 @@ function ScreenUnirse2(){
   } else {
     inner = `
       <h2 class="title">Tus datos</h2>
+      <div id="lookupArea"></div>
       <label>Tu nombre</label>
       <input type="text" id="pname" placeholder="Ej. Marisa" value="${savedProfile?savedProfile.nombre:''}">
       <div style="height:14px"></div>
@@ -1457,6 +1835,11 @@ function ScreenUnirse2(){
     if (m._campoRecordId){
       teeState = TeeGeneroPicker(wrap.querySelector('#teeGeneroArea'), m._campoRecordId, (s)=>{ teeState = {...s}; }, m.tee);
     }
+    ProfileLookup(wrap.querySelector('#lookupArea'), (row)=>{
+      savedProfile = row;
+      Store.setProfileEmail(row.email);
+      render();
+    });
     const profile = ProfileSaveToggle(wrap.querySelector('#profileArea'));
     function setAvatar(url){ avatar=url; wrap.querySelector('#avatarPreview').innerHTML = `<img src="${url}">`; }
     wrap.querySelector('#btnCam').onclick = ()=> wrap.querySelector('#fileCam').click();
@@ -1489,6 +1872,11 @@ function ScreenUnirse2(){
         if (avatar) avatarUrl = avatar.startsWith('data:') ? await uploadAvatar(avatar).catch(()=>null) : avatar;
         let playerId;
         const profileEmail = profile.wanted ? profile.email : null;
+        if (profileEmail){
+          const { error: errProfile } = await sb.from('usuarios').upsert({ email:profileEmail, nombre:name, hcp, avatar_url:avatarUrl });
+          if (errProfile) throw errProfile;
+          Store.setProfileEmail(profileEmail);
+        }
         if (fresh._airtableId){
           const { data: rows, error } = await sb.from('jugadores_partida').insert({
             partida_code: fresh.code, nombre:name, hcp, hcp_campo:hcpCampo, avatar_url:avatarUrl,
@@ -1498,10 +1886,6 @@ function ScreenUnirse2(){
           playerId = rows[0].id;
         } else {
           playerId = uid(); // partida local de demo, sin backend
-        }
-        if (profileEmail){
-          Store.setProfileEmail(profileEmail);
-          Sync.saveProfile(profileEmail, name, hcp, avatarUrl).catch(err=>console.error('Guardar perfil:',err));
         }
         const player = { id:playerId, name, hcp, hcpCampo, avatar:avatarUrl, isMaster:false,
           holes:new Array(fresh.holes).fill(null), currentHole:0 };
@@ -1636,19 +2020,17 @@ function ScreenPlay(){
   wrap.appendChild(el(`<div class="meta-chip">⛳ ${match.campoNombre}</div>`));
   wrap.appendChild(el(`<div class="meta-chip">Código: <b style="color:var(--dorado-claro)">&nbsp;${match.code}</b></div>`));
   if (match.modalidad==='parejas') wrap.appendChild(el(`<div class="meta-chip">👥 Parejas</div>`));
-  if (me.isMaster){
-    const shareBtn = el(`<button class="btn btn-gold" id="btnShare" style="padding:7px 12px;font-size:12.5px;margin-left:6px;">📲 Compartir por WhatsApp</button>`);
-    shareBtn.onclick = ()=>{
-      const link = location.origin + location.pathname + '?code=' + match.code;
-      const text = `⛳ ¡Únete a nuestra partida en ${match.campoNombre}! Código: ${match.code}\n${link}`;
-      window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
-    };
-    wrap.appendChild(shareBtn);
-    if (match.modalidad==='parejas'){
-      const parejasBtn = el(`<button class="btn btn-outline" id="btnParejas" style="padding:7px 12px;font-size:12.5px;margin-left:6px;">👥 Agrupar parejas</button>`);
-      parejasBtn.onclick = ()=>{ unsubscribeMatch(); CURRENT = {screen:'agruparParejas', code:match.code, playerId:CURRENT.playerId}; render(); };
-      wrap.appendChild(parejasBtn);
-    }
+  const shareBtn = el(`<button class="btn btn-gold" id="btnShare" style="padding:7px 12px;font-size:12.5px;margin-left:6px;">📲 Compartir por WhatsApp</button>`);
+  shareBtn.onclick = ()=>{
+    const link = location.origin + location.pathname + '?code=' + match.code;
+    const text = `⛳ ¡Únete a nuestra partida en ${match.campoNombre}! Código: ${match.code}\n${link}`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  };
+  wrap.appendChild(shareBtn);
+  if (me.isMaster && match.modalidad==='parejas'){
+    const parejasBtn = el(`<button class="btn btn-outline" id="btnParejas" style="padding:7px 12px;font-size:12.5px;margin-left:6px;">👥 Agrupar parejas</button>`);
+    parejasBtn.onclick = ()=>{ unsubscribeMatch(); CURRENT = {screen:'agruparParejas', code:match.code, playerId:CURRENT.playerId}; render(); };
+    wrap.appendChild(parejasBtn);
   }
   wrap.appendChild(el(`<div style="height:14px"></div>`));
 
@@ -2023,41 +2405,86 @@ const compareSelection = new Set();
 function buildReportPDF(match, ranked, comentarios){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-  let y = 16;
-  doc.setFontSize(18); doc.text('Golf Live — Informe de partida', 14, y); y+=9;
-  doc.setFontSize(11);
-  doc.text(`Campo: ${match.campoNombre}`, 14, y); y+=6;
-  doc.text(`Fecha: ${new Date(match.createdAt).toLocaleDateString('es-ES')}`, 14, y); y+=6;
-  doc.text(`Código: ${match.code}`, 14, y); y+=10;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const verdeOscuro = [13,58,38], verdeCampo = [21,92,57], dorado = [201,162,75], crema = [243,239,226];
 
-  doc.setFontSize(14); doc.text('Clasificación', 14, y); y+=7;
-  doc.setFontSize(10);
-  ranked.forEach((row,idx)=>{
-    doc.text(`${idx+1}. ${row.p.name} — ${row.extra.strokes} golpes — ${fmtDiff(row.diff)}`, 14, y);
-    y+=6;
-  });
+  function header(){
+    doc.setFillColor(...verdeOscuro);
+    doc.rect(0,0,pageW,38,'F');
+    doc.setFillColor(...dorado);
+    doc.rect(0,38,pageW,1.4,'F');
+    doc.setTextColor(...dorado);
+    doc.setFont('helvetica','bold'); doc.setFontSize(22);
+    doc.text('GOLF LIVE', 14, 17);
+    doc.setTextColor(...crema);
+    doc.setFont('helvetica','normal'); doc.setFontSize(11);
+    doc.text('Informe de partida', 14, 25);
+    doc.setFontSize(9);
+    doc.text(`${match.campoNombre}   ·   ${new Date(match.createdAt).toLocaleDateString('es-ES')}   ·   Código ${match.code}`, 14, 32);
+    doc.setTextColor(20,20,20);
+  }
+  header();
+  let y = 50;
 
-  y+=6;
-  if (y>250){ doc.addPage(); y=16; }
-  doc.setFontSize(14); doc.text('Golpes por hoyo', 14, y); y+=7;
-  doc.setFontSize(7.5);
-  const colW = match.holes>18?7:8, x0=14, nameW=28;
-  doc.text('Jugador', x0, y);
-  for (let h=0; h<match.holes; h++){ doc.text(String(h+1), x0+nameW+h*colW, y); }
-  y+=5;
-  ranked.forEach(row=>{
-    if (y>285){ doc.addPage(); y=16; }
-    doc.text((row.p.name||'').slice(0,14), x0, y);
-    row.p.holes.forEach((val,h)=>{ doc.text(val!=null?String(val):'-', x0+nameW+h*colW, y); });
-    y+=5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('Clasificación final', 14, y);
+  y += 4;
+  doc.autoTable({
+    startY: y,
+    head: [['#','Jugador','Hcp.','Hcp. campo','Golpes','Resultado']],
+    body: ranked.map((row,idx)=>[
+      idx+1, row.p.name + (row.p.isMaster?' (master)':''), row.p.hcp, row.p.hcpCampo, row.extra.strokes, fmtDiff(row.diff)
+    ]),
+    theme: 'striped',
+    headStyles: { fillColor: verdeCampo, textColor: [255,255,255], fontStyle:'bold' },
+    alternateRowStyles: { fillColor: [237,243,238] },
+    styles: { fontSize: 9.5, cellPadding: 3.2 },
+    margin: { left:14, right:14 }
   });
+  y = doc.lastAutoTable.finalY + 12;
+
+  if (y > 250){ doc.addPage(); y = 20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('Golpes por hoyo', 14, y);
+  y += 4;
+
+  const hoyosData = match._campoRecordId ? hoyosCache.byCampo[match._campoRecordId] : null;
+  const pares = (hoyosData && hoyosData.length===match.holes) ? hoyosData.map(h=>h.par) : new Array(match.holes).fill(Math.round(match.par/match.holes));
+  const holeHead = ['Jugador', ...Array.from({length:match.holes},(_,i)=>String(i+1)), 'Total'];
+  const parTotalRow = ['Par', ...pares, pares.reduce((s,p)=>s+p,0)];
+  const bodyRows = ranked.map(row=>[
+    row.p.name, ...row.p.holes.map(h=> h!=null? h : '-'), strokesSum(row.p)
+  ]);
+  doc.autoTable({
+    startY: y,
+    head: [holeHead],
+    body: [parTotalRow, ...bodyRows],
+    theme: 'grid',
+    headStyles: { fillColor: verdeCampo, textColor:[255,255,255], fontSize:7, halign:'center' },
+    styles: { fontSize:7, cellPadding:1.6, halign:'center', textColor:[30,30,30] },
+    columnStyles: { 0: { halign:'left', fontStyle:'bold', cellWidth: 26 } },
+    margin: { left:14, right:14 },
+    didParseCell: (data)=>{
+      if (data.row.index===0){ data.cell.styles.fillColor = [231,222,196]; data.cell.styles.fontStyle='bold'; }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 12;
 
   if (comentarios && comentarios.trim()){
-    y+=8;
-    if (y>260){ doc.addPage(); y=16; }
-    doc.setFontSize(12); doc.text('Comentarios', 14, y); y+=6;
-    doc.setFontSize(10);
-    doc.text(doc.splitTextToSize(comentarios, 180), 14, y);
+    if (y > 250){ doc.addPage(); y = 20; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20,20,20);
+    doc.text('Comentarios', 14, y); y += 6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+    doc.text(doc.splitTextToSize(comentarios, pageW-28), 14, y);
+  }
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(140,140,140);
+    doc.text('Golf Live · Marcador en tiempo real', 14, pageH-8);
+    doc.text(`Página ${i} de ${pageCount}`, pageW-14, pageH-8, {align:'right'});
   }
   return doc;
 }
