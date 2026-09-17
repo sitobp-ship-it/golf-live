@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
   --verde-negro:#081a13;
@@ -171,14 +173,20 @@ input.code-input{text-align:center;letter-spacing:10px;font-size:26px;font-famil
 .hole-par{color:var(--dorado-claro);font-size:16px;margin:10px 0 16px;font-weight:700;}
 .close-master{margin-top:18px;padding-top:16px;border-top:1px dashed var(--gris-linea);}
 
-/* hoyo | golpes lado a lado, ambos grandes (pensado para verse bien de lejos) */
-.score-side{display:flex;gap:10px;align-items:flex-start;justify-content:center;}
-.score-side .col{flex:1;min-width:0;}
-.score-side .col-label{font-family:'Bebas Neue';font-size:13px;letter-spacing:1.5px;color:rgba(243,239,226,.5);margin-bottom:2px;}
-.score-side .big-num{font-family:'Bebas Neue';font-size:88px;line-height:1;color:var(--crema);}
-.strokes-input-wrap{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;}
-.stepper-btn{width:52px;height:52px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--gris-linea);color:var(--crema);font-size:26px;cursor:pointer;}
-.strokes-display{font-family:'Bebas Neue';font-size:88px;width:100px;text-align:center;background:transparent;border:none;color:var(--crema);}
+/* hoyo | golpes lado a lado, ambos grandes (pensado para verse bien de lejos),
+   con un marco dorado suave y redondeado que enmarca las dos columnas juntas */
+.score-side{display:flex;gap:0;align-items:stretch;justify-content:center;
+  border:1.5px solid rgba(201,162,75,.45);border-radius:22px;padding:16px 6px;
+  background:rgba(201,162,75,.06);}
+.score-side .col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;}
+.score-side .col:first-child{border-right:1.5px solid rgba(201,162,75,.4);}
+.score-side .col-label{font-family:'Bebas Neue';font-size:20px;letter-spacing:1.5px;color:#ffffff;margin-bottom:2px;}
+.score-side .big-num{font-family:'Bebas Neue';font-size:108px;line-height:108px;height:108px;color:#ffffff;}
+.strokes-input-wrap{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;}
+.stepper-btn{width:48px;height:48px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--gris-linea);color:var(--crema);font-size:24px;cursor:pointer;}
+input.strokes-display{font-family:'Bebas Neue';font-size:108px;line-height:108px;height:108px;width:150px;text-align:center;background:transparent;border:none;color:#ffffff;padding:0;margin:0;box-sizing:content-box;-moz-appearance:textfield;}
+input.strokes-display::-webkit-outer-spin-button,input.strokes-display::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+@media (max-width:380px){ input.strokes-display{font-size:74px;line-height:74px;height:74px;width:105px;} .score-side .big-num{font-size:74px;line-height:74px;height:74px;} .score-side .col-label{font-size:16px;} }
 
 /* mensaje de resultado (par / birdie / bogey...) */
 .result-msg{font-size:14.5px;font-weight:700;margin:4px 0 14px;padding:10px 14px;border-radius:12px;min-height:18px;}
@@ -271,6 +279,34 @@ table.scorecard-grid td.par-row{color:rgba(243,239,226,.45);font-size:10.5px;}
 /* informe / whatsapp */
 .results-actions{display:flex;gap:8px;flex-wrap:wrap;}
 textarea.comments{width:100%;background:rgba(0,0,0,.28);border:1px solid var(--gris-linea);color:var(--crema);padding:12px 14px;border-radius:12px;font-size:14px;font-family:'Inter';min-height:80px;resize:vertical;}
+
+/* chat en vivo */
+.chat-list{max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;margin-bottom:12px;padding-right:4px;}
+.chat-msg{background:rgba(255,255,255,.04);border-radius:10px;padding:9px 12px;font-size:13.5px;line-height:1.4;}
+.chat-msg b{color:var(--dorado-claro);margin-right:5px;}
+.chat-input-row{display:flex;gap:8px;}
+.chat-input-row input{flex:1;}
+
+/* modo parejas: agrupar */
+.pareja-slot{border:1.5px dashed var(--gris-linea);border-radius:14px;padding:12px;margin-bottom:12px;min-height:56px;}
+.pareja-slot.target{border-color:var(--dorado);background:rgba(201,162,75,.06);}
+.pareja-slot h4{margin:0 0 8px;font-family:'Bebas Neue';font-size:15px;letter-spacing:.5px;color:rgba(243,239,226,.6);}
+.player-chip{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.06);border:1.5px solid var(--gris-linea);border-radius:20px;padding:6px 12px 6px 6px;margin:0 6px 6px 0;cursor:pointer;font-size:13px;}
+.player-chip.picked{border-color:var(--dorado);background:rgba(201,162,75,.12);}
+.player-chip .mini-avatar{width:26px;height:26px;font-size:10px;}
+
+/* GPS caddie */
+.gps-box{margin-top:14px;padding:14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--gris-linea);text-align:left;}
+.gps-box .gps-dist{font-family:'Bebas Neue';font-size:30px;color:var(--dorado-claro);}
+.gps-box .gps-club{font-size:14px;font-weight:700;margin-top:2px;}
+
+/* historial partidas en Inicio */
+.history-list{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
+.history-item{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.04);border-radius:12px;padding:11px 14px;cursor:pointer;border:1px solid transparent;}
+.history-item:hover{border-color:var(--dorado);}
+.history-item .hleft{text-align:left;}
+.history-item .hname{font-weight:700;font-size:14px;}
+.history-item .hsub{font-size:11.5px;color:rgba(243,239,226,.5);}
 </style>
 </head>
 <body>
@@ -315,7 +351,7 @@ const safeStorage = {
   setItem(k,v){ if (LS_OK){ try { localStorage.setItem(k,v); return; } catch(e){ /* cae a memoria */ } } memoryFallback[k]=v; },
 };
 
-/* ---------------- STORE (localStorage hoy, Airtable mañana) ---------------- */
+/* ---------------- STORE (cache local instantánea) ---------------- */
 const Store = {
   getCourseData(courseId){
     const all = JSON.parse(safeStorage.getItem('golf_courses_v1') || '{}');
@@ -340,113 +376,122 @@ const Store = {
     let code;
     do { code = String(Math.floor(1000 + Math.random()*9000)); } while (Store.matchExists(code));
     return code;
-  }
+  },
+  getProfileEmail(){ return safeStorage.getItem('golf_profile_email') || null; },
+  setProfileEmail(email){ safeStorage.setItem('golf_profile_email', email); }
 };
 
 /* =========================================================
-   AIRTABLE — persistencia real y sincronización entre jugadores/dispositivos.
-   El Store de arriba sigue siendo la caché local instantánea (para que la UI
-   nunca espere a la red); estas funciones empujan/traen los datos de Airtable
-   por debajo. NOTA: el token vive en el HTML porque es una app estática sin
-   backend — cualquiera que abra el código fuente puede verlo. Para este uso
-   familiar el riesgo es bajo, pero el token solo tiene acceso a esta base.
+   SUPABASE — persistencia real, tiempo real (Realtime) y almacenamiento
+   de avatares. La clave "anon public" es segura de exponer en el cliente
+   (para eso existe): el acceso real lo controla Row Level Security en el
+   propio proyecto. No hace falta proxy como con el token de Airtable.
    ========================================================= */
-/* El token de Airtable YA NO vive aquí: lo guarda Vercel como variable de entorno
-   (AIRTABLE_TOKEN) y solo lo usa la función serverless /api/airtable.js. Este
-   archivo, que descarga cualquiera que visite la web, nunca lo ve. */
-const AIRTABLE_BASE = 'appXjKghvDkcgord0';
-const T = {
-  campos: 'tblPn2sJEm6pruvRt',
-  tramos: 'tblzDLADzPjCb1Gmy',
-  partidas: 'tblf06k42rIYScVZx',
-  jugadores: 'tblryDz0OFYL1ykHm',
-  golpes: 'tblb2sljFgIzGCrja',
-  hoyos: 'tblAHe5ltT3AKJtOS',
-  tees: 'tblAiuNeoJicQ0dva'
-};
-const AVATAR_FIELD_ID = 'fld9P3CPLRRexrRCs';
+const SUPABASE_URL = 'https://nyrazvjukcseqrskkwvg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55cmF6dmp1a2NzZXFyc2trd3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1ODg4MzAsImV4cCI6MjEwNTE2NDgzMH0.k2NCRlhn9hn_gZYT-7Jm6mLQt9XXdQU87CkwlaQxwG0';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-async function atRequest(method, table, path, body, _retry){
-  const airtablePath = `/v0/${AIRTABLE_BASE}/${table}${path||''}`;
-  const url = `/api/airtable?host=api&path=${encodeURIComponent(airtablePath)}`;
-  const res = await fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
+/* perfil guardado (si ya se usó este dispositivo con un email): se carga una vez
+   al arrancar para poder rellenar nombre/hándicap/avatar automáticamente. */
+let savedProfile = null;
+(function loadSavedProfile(){
+  const email = Store.getProfileEmail();
+  if (!email) return;
+  sb.from('usuarios').select('*').eq('email', email).limit(1).then(({data})=>{
+    if (data && data.length) savedProfile = data[0];
+  }).catch(()=>{});
+})();
+
+/* historial de partidas de un usuario (por email), con datos enriquecidos
+   (golpes, hoyos, nº de jugadores) para la pantalla de inicio y el perfil */
+async function fetchUserHistory(email){
+  const { data: jugRows } = await sb.from('jugadores_partida').select('id, partida_code, golpes').eq('usuario_email', email);
+  const rows = jugRows || [];
+  if (!rows.length) return [];
+  const codes = [...new Set(rows.map(r=>r.partida_code))];
+  await ensureCamposCache().catch(()=>{});
+  const { data: partidasRows } = await sb.from('partidas').select('*').in('code', codes);
+  const { data: allPlayers } = await sb.from('jugadores_partida').select('partida_code').in('partida_code', codes);
+  const countByCode = {};
+  (allPlayers||[]).forEach(pl=>{ countByCode[pl.partida_code] = (countByCode[pl.partida_code]||0)+1; });
+  const rowByCode = {};
+  rows.forEach(r=>{ rowByCode[r.partida_code] = r; });
+  return (partidasRows||[]).map(p=>{
+    const campo = p.campo_id ? camposCache.byRecordId[p.campo_id] : null;
+    const jr = rowByCode[p.code];
+    const golpes = (jr && Array.isArray(jr.golpes)) ? jr.golpes.reduce((s,h)=>s+(h||0),0) : 0;
+    return {
+      code: p.code, playerId: jr ? jr.id : null,
+      campoNombre: campo?campo.nombre:(p.campo_nombre_libre||'Otro campo'),
+      status: p.status, holes: p.holes, par: p.par, modalidad: p.modalidad||'individual',
+      golpes, jugadores: countByCode[p.code]||0,
+      createdAt: p.created_at ? new Date(p.created_at).getTime() : 0
+    };
+  }).sort((a,b)=>{
+    if ((a.status==='open') !== (b.status==='open')) return a.status==='open' ? -1 : 1;
+    return b.createdAt - a.createdAt;
   });
-  if (res.status === 429 && !_retry){
-    const wait = (parseFloat(res.headers.get('Retry-After')||'1'))*1000;
-    await new Promise(r=>setTimeout(r, wait));
-    return atRequest(method, table, path, body, true);
+}
+
+/* estadisticas de un usuario a partir de su historial: campos mas jugados,
+   total de partidas cerradas y distribucion de posiciones finales conseguidas */
+async function computeUserStats(email, history){
+  const closed = history.filter(h=>h.status==='closed');
+  const porCampo = {};
+  closed.forEach(h=>{ porCampo[h.campoNombre] = (porCampo[h.campoNombre]||0)+1; });
+  const posiciones = {};
+  for (const h of closed){
+    const match = await fetchMatchFromSupabase(h.code).catch(()=>null);
+    if (!match) continue;
+    let idx = -1;
+    if (match.modalidad==='parejas'){
+      const ranked = rankParejas(match, match.players);
+      idx = ranked.findIndex(r=> r.members.some(m=>m.usuarioEmail===email));
+    } else {
+      const ranked = rankPlayers(match, match.players, false);
+      idx = ranked.findIndex(r=> r.p.usuarioEmail===email);
+    }
+    if (idx>=0) posiciones[idx+1] = (posiciones[idx+1]||0)+1;
   }
-  if (!res.ok){
-    const errText = await res.text().catch(()=> '');
-    throw new Error(`Airtable ${method} ${table} ${res.status}: ${errText}`);
-  }
-  return res.status === 204 ? null : res.json();
+  return { totalPartidas: closed.length, porCampo, posiciones };
 }
-async function atList(table, filterByFormula){
-  let all = [], offset;
-  do {
-    const qs = new URLSearchParams();
-    if (filterByFormula) qs.set('filterByFormula', filterByFormula);
-    qs.set('pageSize','100');
-    if (offset) qs.set('offset', offset);
-    const data = await atRequest('GET', table, `?${qs.toString()}`);
-    all = all.concat(data.records);
-    offset = data.offset;
-  } while(offset);
-  return all;
+const homeHistoryState = { email:null, history:null, loading:false };
+function ensureHomeHistory(email){
+  if (homeHistoryState.email===email && (homeHistoryState.history || homeHistoryState.loading)) return;
+  homeHistoryState.email = email; homeHistoryState.loading = true; homeHistoryState.history = null;
+  fetchUserHistory(email).then(history=>{
+    homeHistoryState.history = history; homeHistoryState.loading = false;
+    if (CURRENT.screen==='home') render();
+  }).catch(()=>{ homeHistoryState.loading = false; });
 }
-async function atCreate(table, fields){
-  const data = await atRequest('POST', table, '', { records:[{fields}] });
-  return data.records[0];
-}
-async function atCreateMany(table, fieldsArr){
-  let out = [];
-  for (let i=0;i<fieldsArr.length;i+=10){
-    const chunk = fieldsArr.slice(i,i+10).map(f=>({fields:f}));
-    const data = await atRequest('POST', table, '', { records: chunk });
-    out = out.concat(data.records);
-  }
-  return out;
-}
-async function atUpdate(table, recordId, fields){
-  return atRequest('PATCH', table, `/${recordId}`, { fields });
-}
-async function atDeleteMany(table, ids){
-  for (let i=0;i<ids.length;i+=10){
-    const qs = ids.slice(i,i+10).map(id=>`records[]=${id}`).join('&');
-    await atRequest('DELETE', table, `?${qs}`);
-  }
-}
-async function atUploadAttachment(recordId, fieldId, dataUrl, filename){
+
+/* sube un avatar (data URL) al bucket publico "avatars" y devuelve su URL permanente.
+   Corrige el bug de avatares invisibles para otros jugadores: antes se guardaban
+   como adjuntos de Airtable, cuya URL firmada caduca; Supabase Storage da una URL
+   publica estable que no caduca. */
+async function uploadAvatar(dataUrl){
   const m = /^data:(.+?);base64,(.+)$/.exec(dataUrl||'');
   if (!m) return null;
   const [, contentType, base64] = m;
-  const airtablePath = `/v0/${AIRTABLE_BASE}/${recordId}/${fieldId}/uploadAttachment`;
-  const url = `/api/airtable?host=content&path=${encodeURIComponent(airtablePath)}`;
-  const res = await fetch(url, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json' },
-    body: JSON.stringify({ contentType, file: base64, filename: filename||'avatar.jpg' })
-  });
-  if (!res.ok) throw new Error('Error subiendo avatar: '+res.status);
-  return res.json();
+  const ext = (contentType.split('/')[1]||'jpg').replace('jpeg','jpg');
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const bytes = Uint8Array.from(atob(base64), c=>c.charCodeAt(0));
+  const { error } = await sb.storage.from('avatars').upload(path, bytes, { contentType, upsert:false });
+  if (error){ console.error('Error subiendo avatar:', error); return null; }
+  const { data } = sb.storage.from('avatars').getPublicUrl(path);
+  return data.publicUrl;
 }
 
-/* caché de la tabla Campos (se carga una vez) */
+/* caché de la tabla campos (se carga una vez) */
 const camposCache = { byCourseId:{}, byRecordId:{}, grupos:[], ready:false, _promise:null };
 function ensureCamposCache(){
   if (camposCache.ready) return Promise.resolve(camposCache);
   if (camposCache._promise) return camposCache._promise;
-  camposCache._promise = atList(T.campos).then(recs=>{
+  camposCache._promise = sb.from('campos').select('*').then(({data, error})=>{
+    if (error) throw error;
     const gruposMap = {};
-    recs.forEach(r=>{
-      const entry = {
-        id:r.id, courseId:r.fields.CourseId, nombre:r.fields.Nombre, imagen:r.fields.ImagenURL,
-        clubBase: r.fields.ClubBase || r.fields.Nombre, recorrido: r.fields.NombreRecorrido || ''
-      };
+    (data||[]).forEach(r=>{
+      const entry = { id:r.id, courseId:r.course_slug, nombre:r.nombre, imagen:r.imagen_url, clubBase: r.club_base||r.nombre, recorrido: r.nombre_recorrido||'' };
       camposCache.byCourseId[entry.courseId] = entry;
       camposCache.byRecordId[entry.id] = entry;
       if (!gruposMap[entry.clubBase]) gruposMap[entry.clubBase] = { label:entry.clubBase, imagen:entry.imagen, entries:[] };
@@ -455,65 +500,62 @@ function ensureCamposCache(){
     camposCache.grupos = Object.values(gruposMap);
     camposCache.ready = true;
     return camposCache;
-  }).catch(err=>{ console.error('No se pudo cargar Campos de Airtable:', err); camposCache._promise=null; throw err; });
+  }).catch(err=>{ console.error('No se pudo cargar Campos:', err); camposCache._promise=null; throw err; });
   return camposCache._promise;
 }
 ensureCamposCache().catch(()=>{}); // precarga en segundo plano al abrir la app
 
-/* caché de Hoyos: par + indice de handicap por hoyo, agrupado por campo (recordId) */
+/* caché de hoyos: par + indice de handicap (+ coordenadas del green si existen) */
 const hoyosCache = { byCampo:{}, ready:false, _promise:null };
 function ensureHoyosCache(){
   if (hoyosCache.ready) return Promise.resolve(hoyosCache);
   if (hoyosCache._promise) return hoyosCache._promise;
-  hoyosCache._promise = atList(T.hoyos).then(recs=>{
-    recs.forEach(r=>{
-      const campoId = (r.fields.Campo && r.fields.Campo[0]) || null;
-      if (!campoId) return;
-      if (!hoyosCache.byCampo[campoId]) hoyosCache.byCampo[campoId] = [];
-      hoyosCache.byCampo[campoId].push({ numero:r.fields.NumeroHoyo, par:r.fields.Par, indice:r.fields.IndiceHandicap });
+  hoyosCache._promise = sb.from('hoyos').select('*').then(({data, error})=>{
+    if (error) throw error;
+    (data||[]).forEach(r=>{
+      if (!hoyosCache.byCampo[r.campo_id]) hoyosCache.byCampo[r.campo_id] = [];
+      hoyosCache.byCampo[r.campo_id].push({ numero:r.numero, par:r.par, indice:r.indice_handicap, lat:r.green_lat, lng:r.green_lng });
     });
     Object.values(hoyosCache.byCampo).forEach(arr=> arr.sort((a,b)=>a.numero-b.numero));
     hoyosCache.ready = true;
     return hoyosCache;
-  }).catch(err=>{ console.error('No se pudo cargar Hoyos de Airtable:', err); hoyosCache._promise=null; throw err; });
+  }).catch(err=>{ console.error('No se pudo cargar Hoyos:', err); hoyosCache._promise=null; throw err; });
   return hoyosCache._promise;
 }
 ensureHoyosCache().catch(()=>{});
 
-/* caché de TeesCampo: CR/SR por campo+tee+genero */
+/* caché de tees_campo: CR/SR por campo+tee+genero */
 const teesCache = { byCampo:{}, ready:false, _promise:null };
 function ensureTeesCache(){
   if (teesCache.ready) return Promise.resolve(teesCache);
   if (teesCache._promise) return teesCache._promise;
-  teesCache._promise = atList(T.tees).then(recs=>{
-    recs.forEach(r=>{
-      const campoId = (r.fields.Campo && r.fields.Campo[0]) || null;
-      if (!campoId) return;
-      if (!teesCache.byCampo[campoId]) teesCache.byCampo[campoId] = [];
-      teesCache.byCampo[campoId].push({ tee:r.fields.Tee, genero:r.fields.Genero, cr:r.fields.CR, sr:r.fields.SR, par:r.fields.Par });
+  teesCache._promise = sb.from('tees_campo').select('*').then(({data, error})=>{
+    if (error) throw error;
+    (data||[]).forEach(r=>{
+      if (!teesCache.byCampo[r.campo_id]) teesCache.byCampo[r.campo_id] = [];
+      teesCache.byCampo[r.campo_id].push({ tee:r.tee, genero:r.genero, cr:r.cr, sr:r.sr, par:r.par });
     });
     teesCache.ready = true;
     return teesCache;
-  }).catch(err=>{ console.error('No se pudo cargar TeesCampo de Airtable:', err); teesCache._promise=null; throw err; });
+  }).catch(err=>{ console.error('No se pudo cargar TeesCampo:', err); teesCache._promise=null; throw err; });
   return teesCache._promise;
 }
 ensureTeesCache().catch(()=>{});
 
-/* caché de TramosHandicap: tabla granular oficial (min/max hcp persona -> hcp campo), por campo+tee+genero */
+/* caché de campos_handicap: tabla granular oficial (min/max hcp persona -> hcp campo) */
 const tramosCache = { byCampo:{}, ready:false, _promise:null };
 function ensureTramosCache(){
   if (tramosCache.ready) return Promise.resolve(tramosCache);
   if (tramosCache._promise) return tramosCache._promise;
-  tramosCache._promise = atList(T.tramos).then(recs=>{
-    recs.forEach(r=>{
-      const campoId = (r.fields.Campo && r.fields.Campo[0]) || null;
-      if (!campoId || !r.fields.Tee) return; // filas del flujo manual antiguo no tienen Tee: se ignoran aqui
-      if (!tramosCache.byCampo[campoId]) tramosCache.byCampo[campoId] = [];
-      tramosCache.byCampo[campoId].push({ tee:r.fields.Tee, genero:r.fields.Genero, min:r.fields.HcpDesde, max:r.fields.HcpHasta, hcpCampo:r.fields.HcpCampo });
+  tramosCache._promise = sb.from('campos_handicap').select('*').then(({data, error})=>{
+    if (error) throw error;
+    (data||[]).forEach(r=>{
+      if (!tramosCache.byCampo[r.campo_id]) tramosCache.byCampo[r.campo_id] = [];
+      tramosCache.byCampo[r.campo_id].push({ tee:r.tee, genero:r.genero, min:r.hcp_desde, max:r.hcp_hasta, hcpCampo:r.hcp_campo });
     });
     tramosCache.ready = true;
     return tramosCache;
-  }).catch(err=>{ console.error('No se pudo cargar TramosHandicap de Airtable:', err); tramosCache._promise=null; throw err; });
+  }).catch(err=>{ console.error('No se pudo cargar campos_handicap:', err); tramosCache._promise=null; throw err; });
   return tramosCache._promise;
 }
 ensureTramosCache().catch(()=>{});
@@ -535,59 +577,41 @@ function computeHcpCampo(campoRecordId, tee, genero, hcpIndex){
   return null;
 }
 
-/* trae una partida completa (con jugadores y golpes) desde Airtable */
-async function fetchMatchFromAirtable(code){
+/* trae una partida completa (con jugadores) desde Supabase */
+async function fetchMatchFromSupabase(code){
   await ensureCamposCache().catch(()=>{});
-  const partidas = await atList(T.partidas, `{Codigo}="${code}"`);
-  if (partidas.length === 0) return null;
+  const { data: partidas, error: errP } = await sb.from('partidas').select('*').eq('code', code).limit(1);
+  if (errP || !partidas || partidas.length===0) return null;
   const p = partidas[0];
-  const campoLink = (p.fields.Campo && p.fields.Campo[0]) || null;
-  const campo = campoLink ? camposCache.byRecordId[campoLink] : null;
-  const holesTotal = p.fields.Hoyos || HOLE_COUNT_DEFAULT;
-
-  // Los campos de enlace no se pueden filtrar de forma fiable con filterByFormula
-  // (dentro de una fórmula, un campo de enlace expone el campo primario del registro
-  // enlazado, no su recordId) así que se trae la tabla entera y se filtra en el cliente
-  // comparando IDs reales. Para el volumen de esta app (partidas familiares) es trivial.
-  const allJugadores = await atList(T.jugadores);
-  const jugadoresRecs = allJugadores.filter(j => (j.fields.Partida||[]).includes(p.id));
-  const allGolpes = await atList(T.golpes);
-  const players = jugadoresRecs.map((j)=>{
-    const golpesRecs = allGolpes.filter(g => (g.fields.Jugador||[]).includes(j.id));
-    const holes = new Array(holesTotal).fill(null);
-    const golpesIds = new Array(holesTotal).fill(null);
-    golpesRecs.forEach(g=>{
-      const h = g.fields.Hoyo;
-      if (h>=1 && h<=holesTotal){ holes[h-1] = g.fields.Golpes; golpesIds[h-1] = g.id; }
-    });
-    const avatarAtt = j.fields.Avatar && j.fields.Avatar[0];
+  const campo = p.campo_id ? camposCache.byRecordId[p.campo_id] : null;
+  const holesTotal = p.holes || HOLE_COUNT_DEFAULT;
+  const { data: jugadores } = await sb.from('jugadores_partida').select('*').eq('partida_code', code).order('created_at', { ascending:true });
+  const players = (jugadores||[]).map(j=>{
+    const holes = (Array.isArray(j.golpes) && j.golpes.length===holesTotal) ? j.golpes : new Array(holesTotal).fill(null);
     return {
-      id: j.id, name: j.fields.Nombre, hcp: j.fields.Hcp, hcpCampo: j.fields.HcpCampo,
-      avatar: avatarAtt ? avatarAtt.url : null, isMaster: !!j.fields.EsMaster,
-      holes, currentHole: j.fields.HoyoActual || 0, _golpesIds: golpesIds
+      id: j.id, name: j.nombre, hcp: j.hcp, hcpCampo: j.hcp_campo, avatar: j.avatar_url,
+      isMaster: !!j.is_master, holes, currentHole: j.hoyo_actual||0, pareja: j.pareja, usuarioEmail: j.usuario_email
     };
   });
-
   return {
-    _airtableId: p.id, _campoRecordId: campoLink,
-    code: p.fields.Codigo,
-    campoId: campo ? campo.courseId : '', campoNombre: campo ? campo.nombre : (p.fields.Campo?'Campo':''),
-    campoImagen: campo ? campo.imagen : null,
-    holes: holesTotal, par: p.fields.Par, tee: p.fields.Tee || null,
-    createdAt: p.fields.CreadaEn ? new Date(p.fields.CreadaEn).getTime() : Date.now(),
+    _airtableId: p.code, _campoRecordId: p.campo_id,
+    code: p.code, campoId: campo?campo.courseId:'', campoNombre: campo?campo.nombre:(p.campo_id?'Campo':(p.campo_nombre_libre||'Otro campo')),
+    campoImagen: campo?campo.imagen:null,
+    holes: holesTotal, par: p.par, tee: p.tee||null, modalidad: p.modalidad||'individual',
+    createdAt: p.created_at ? new Date(p.created_at).getTime() : Date.now(),
     masterId: (players.find(pl=>pl.isMaster)||{}).id,
-    status: p.fields.Estado, closedAt: p.fields.CerradaEn ? new Date(p.fields.CerradaEn).getTime() : null,
-    comentarios: p.fields.Comentarios || '',
+    status: p.status, closedAt: p.closed_at ? new Date(p.closed_at).getTime() : null,
     players
   };
 }
 
-/* trae de Airtable y fusiona con la caché local, protegiendo mis propios datos
-   si acabo de escribir hace <4s (evita que un poll llegue antes que mi propio guardado) */
+/* trae de Supabase y fusiona con la caché local, protegiendo mis propios datos
+   si acabo de escribir hace <4s (evita que una notificacion en tiempo real
+   llegue justo antes que mi propio guardado y lo pise) */
 let myDirtyUntil = 0;
 function markMineDirty(){ myDirtyUntil = Date.now() + 4000; }
 async function pullAndMerge(code){
-  const remote = await fetchMatchFromAirtable(code);
+  const remote = await fetchMatchFromSupabase(code);
   if (!remote) return null;
   if (Date.now() < myDirtyUntil && CURRENT.playerId){
     const local = Store.getMatch(code);
@@ -599,43 +623,65 @@ async function pullAndMerge(code){
   return remote;
 }
 
-/* funciones de escritura puntual usadas por la UI (crear/unirse ya llaman a atCreate directamente) */
+/* ---------------- Realtime: suscripcion a la partida abierta en pantalla ---------------- */
+let realtimeChannel = null, realtimeCode = null;
+function subscribeMatch(code){
+  if (realtimeCode === code && realtimeChannel) return;
+  unsubscribeMatch();
+  realtimeCode = code;
+  realtimeChannel = sb.channel('partida-'+code)
+    .on('postgres_changes', { event:'*', schema:'public', table:'jugadores_partida', filter:`partida_code=eq.${code}` }, ()=>{
+      pullAndMerge(code).then(()=>{ if (CURRENT.code===code) render(); }).catch(()=>{});
+    })
+    .on('postgres_changes', { event:'*', schema:'public', table:'partidas', filter:`code=eq.${code}` }, ()=>{
+      pullAndMerge(code).then(()=>{ if (CURRENT.code===code) render(); }).catch(()=>{});
+    })
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'comentarios', filter:`partida_code=eq.${code}` }, (payload)=>{
+      if (!chatCache[code]) chatCache[code] = [];
+      if (!chatCache[code].some(m=>m.id===payload.new.id)) chatCache[code].push(payload.new);
+      if (CURRENT.code===code) render();
+    })
+    .subscribe();
+}
+function unsubscribeMatch(){
+  if (realtimeChannel){ sb.removeChannel(realtimeChannel); realtimeChannel=null; }
+  realtimeCode = null;
+}
+
+/* ---------------- Chat / comentarios en vivo por partida ---------------- */
+const chatCache = {};
+async function ensureChatLoaded(code){
+  if (chatCache[code]) return chatCache[code];
+  const { data, error } = await sb.from('comentarios').select('*').eq('partida_code', code).order('created_at', { ascending:true });
+  chatCache[code] = error ? [] : (data||[]);
+  return chatCache[code];
+}
+async function sendChatMessage(code, nombre, texto){
+  const { error } = await sb.from('comentarios').insert({ partida_code:code, nombre, texto });
+  if (error) throw error;
+}
+
+/* funciones de escritura puntual usadas por la UI */
 const Sync = {
-  async saveCourseData(courseId, ranges){
-    const c = await ensureCamposCache();
-    const campoRecId = c.byCourseId[courseId] && c.byCourseId[courseId].id;
-    if (!campoRecId) return;
-    const allTramos = await atList(T.tramos);
-    const existing = allTramos.filter(r => (r.fields.Campo||[]).includes(campoRecId));
-    if (existing.length) await atDeleteMany(T.tramos, existing.map(r=>r.id));
-    await atCreateMany(T.tramos, ranges.map(r=>({
-      Etiqueta: `${r.min}-${r.max}`, Campo:[campoRecId], HcpDesde:r.min, HcpHasta:r.max, HcpCampo:r.hcp
-    })));
-  },
-  async saveHole(matchCode, player, holeIdx, strokes){
-    const existingId = player._golpesIds && player._golpesIds[holeIdx];
-    let recId = existingId;
-    if (existingId){
-      await atUpdate(T.golpes, existingId, { Golpes: strokes });
-    } else {
-      const rec = await atCreate(T.golpes, { Hoyo: holeIdx+1, Jugador:[player.id], Golpes: strokes });
-      recId = rec.id;
-    }
-    const fresh = Store.getMatch(matchCode);
-    if (fresh){
-      const idx = fresh.players.findIndex(p=>p.id===player.id);
-      if (idx>-1){
-        if (!fresh.players[idx]._golpesIds) fresh.players[idx]._golpesIds = [];
-        fresh.players[idx]._golpesIds[holeIdx] = recId;
-        Store.saveMatch(fresh);
-      }
-    }
+  async saveHole(matchCode, player){
+    const { error } = await sb.from('jugadores_partida').update({ golpes: player.holes }).eq('id', player.id);
+    if (error) throw error;
   },
   async saveCurrentHole(player, holeIdx){
-    await atUpdate(T.jugadores, player.id, { HoyoActual: holeIdx });
+    const { error } = await sb.from('jugadores_partida').update({ hoyo_actual: holeIdx }).eq('id', player.id);
+    if (error) throw error;
   },
   async closeMatch(match){
-    await atUpdate(T.partidas, match._airtableId, { Estado:'closed', CerradaEn: new Date().toISOString() });
+    const { error } = await sb.from('partidas').update({ status:'closed', closed_at: new Date().toISOString() }).eq('code', match.code);
+    if (error) throw error;
+  },
+  async savePareja(player, pareja){
+    const { error } = await sb.from('jugadores_partida').update({ pareja }).eq('id', player.id);
+    if (error) throw error;
+  },
+  async saveProfile(email, nombre, hcp, avatarUrl){
+    const { error } = await sb.from('usuarios').upsert({ email, nombre, hcp, avatar_url: avatarUrl });
+    if (error) throw error;
   }
 };
 
@@ -746,9 +792,10 @@ function render(){
     app.appendChild(Brand());
     const screens = {
       home: ScreenHome, crearNombre: ScreenCrearNombre, crearCampo: ScreenCrearCampo,
-      crearRecorrido: ScreenCrearRecorrido,
+      crearRecorrido: ScreenCrearRecorrido, crearCampoLibre: ScreenCrearCampoLibre,
       crear2: ScreenCrear2, crear3: ScreenCrear3,
       unirse1: ScreenUnirse1, unirse2: ScreenUnirse2, play: ScreenPlay, spectate: ScreenSpectate,
+      agruparParejas: ScreenAgruparParejas, perfil: ScreenPerfil,
       results: ScreenResults, consulta: ScreenResults
     };
     const fn = screens[CURRENT.screen] || ScreenHome;
@@ -787,16 +834,352 @@ function card(inner){
 /* ================= HOME ================= */
 function ScreenHome(){
   const wrap = el(`<div class="center-wrap"><div class="card" style="max-width:420px;width:100%;">
-    <h2 class="title">Bienvenido ⛳</h2>
+    <h2 class="title">Bienvenido ⛳${savedProfile?`, ${savedProfile.nombre}`:''}</h2>
     <p class="sub">Anota tu ronda en tiempo real y compite con el resto del grupo, hoyo a hoyo.</p>
     <div class="stack">
       <button class="btn btn-primary btn-block btn-lg" id="btnCrear">Crear partida</button>
       <button class="btn btn-outline btn-block btn-lg" id="btnUnirse">Unirse a partida</button>
+      <button class="btn btn-outline btn-block" id="btnPerfil">👤 Mi perfil</button>
     </div>
+    <div id="historyArea"></div>
   </div></div>`);
   wrap.querySelector('#btnCrear').onclick = ()=>{ CURRENT = {screen:'crearNombre', data:{}}; render(); };
   wrap.querySelector('#btnUnirse').onclick = ()=>{ CURRENT = {screen:'unirse1', data:{}}; render(); };
+  wrap.querySelector('#btnPerfil').onclick = ()=>{ CURRENT = {screen:'perfil'}; render(); };
+
+  const email = Store.getProfileEmail();
+  if (email){
+    const historyArea = wrap.querySelector('#historyArea');
+    ensureHomeHistory(email);
+    if (homeHistoryState.email===email && homeHistoryState.history){
+      const h = homeHistoryState.history;
+      if (h.length){
+        const listWrap = el(`<div style="margin-top:18px;text-align:left;">
+          <h3 style="font-family:'Bebas Neue';font-size:15px;letter-spacing:.5px;margin:0 0 8px;color:rgba(243,239,226,.6);">Tus partidas</h3>
+          <div class="history-list"></div>
+        </div>`);
+        const listEl = listWrap.querySelector('.history-list');
+        h.forEach(item=>{
+          const row = el(`<div class="history-item">
+            <div class="hleft"><div class="hname">${item.campoNombre}</div><div class="hsub">${item.status==='open'?'🟢 En curso':'🔒 Cerrada'} · Código ${item.code}</div></div>
+            <div>›</div>
+          </div>`);
+          row.onclick = ()=> openHistoryMatch(item);
+          listEl.appendChild(row);
+        });
+        historyArea.appendChild(listWrap);
+      }
+    } else if (homeHistoryState.loading){
+      historyArea.appendChild(el(`<p class="sub" style="margin-top:14px;">Cargando tu historial…</p>`));
+    }
+  }
   return wrap;
+}
+function openHistoryMatch(item){
+  fetchMatchFromSupabase(item.code).then(match=>{
+    if (!match) return;
+    Store.saveMatch(match);
+    CURRENT = { screen: match.status==='closed' ? 'results' : 'play', code:match.code, playerId:item.playerId };
+    render();
+  }).catch(err=>console.error('Historial:',err));
+}
+
+/* ================= MI PERFIL: editar datos, historial y estadisticas ================= */
+let perfilTab = 'editar';
+const perfilState = { email:null, profile:null, history:null, stats:null, historyLoading:false, statsLoading:false };
+
+function ScreenPerfil(){
+  const wrap = document.createElement('div');
+  const topBar = el(`<div class="row" style="margin-bottom:10px;"><button class="btn btn-outline" id="btnMenu">← Menú principal</button></div>`);
+  topBar.querySelector('#btnMenu').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  wrap.appendChild(topBar);
+
+  const email = CURRENT.perfilEmail || Store.getProfileEmail();
+  if (!email){
+    wrap.appendChild(PerfilEmailGate());
+    return wrap;
+  }
+  if (perfilState.email !== email){
+    perfilState.email = email; perfilState.profile = null; perfilState.history = null; perfilState.stats = null;
+    perfilTab = 'editar';
+  }
+  if (!perfilState.profile){
+    if (savedProfile && savedProfile.email===email){
+      perfilState.profile = savedProfile;
+    } else if (CURRENT.perfilNuevo){
+      perfilState.profile = { email, nombre:'', hcp:null, avatar_url:null };
+    } else {
+      sb.from('usuarios').select('*').eq('email', email).limit(1).then(({data})=>{
+        perfilState.profile = (data && data.length) ? data[0] : { email, nombre:'', hcp:null, avatar_url:null };
+        if (data && data.length) savedProfile = data[0];
+        if (CURRENT.screen==='perfil') render();
+      });
+      wrap.appendChild(card(`<p class="sub" style="margin:0;">Cargando tu perfil…</p>`));
+      return wrap;
+    }
+  }
+
+  wrap.appendChild(card(`<h2 class="title">👤 Mi perfil</h2><p class="sub">${email}</p>`));
+
+  const tabs = el(`<div class="tabs">
+    <button class="tab-btn ${perfilTab==='editar'?'active':''}" data-t="editar">Editar perfil</button>
+    <button class="tab-btn ${perfilTab==='historial'?'active':''}" data-t="historial">Historial</button>
+    <button class="tab-btn ${perfilTab==='estadisticas'?'active':''}" data-t="estadisticas">Estadísticas</button>
+  </div>`);
+  tabs.querySelectorAll('.tab-btn').forEach(b=> b.onclick = ()=>{ perfilTab=b.dataset.t; render(); });
+  wrap.appendChild(tabs);
+
+  if (perfilTab==='editar') wrap.appendChild(PerfilEditar(email));
+  if (perfilTab==='historial') wrap.appendChild(PerfilHistorial(email));
+  if (perfilTab==='estadisticas') wrap.appendChild(PerfilEstadisticas(email));
+
+  return wrap;
+}
+
+function PerfilEmailGate(){
+  const box = card(`<h2 class="title">👤 Mi perfil</h2>
+    <p class="sub">Escribe tu email para ver o crear tu perfil: tus datos, tu historial de partidas y tus estadísticas.</p>
+    <label>Tu email</label>
+    <div class="row"><input type="text" id="gateEmail" placeholder="tucorreo@ejemplo.com" style="flex:1;" value="${savedProfile?savedProfile.email:''}"><button class="btn btn-primary" id="gateBtn">Buscar</button></div>
+    <div id="gateMsg" style="margin-top:10px;"></div>`);
+  const msg = box.querySelector('#gateMsg');
+  async function doSearch(){
+    const email = box.querySelector('#gateEmail').value.trim();
+    if (!email){ msg.innerHTML = '<p class="error-msg">Escribe un email.</p>'; return; }
+    msg.innerHTML = '<p class="sub">Buscando…</p>';
+    const { data } = await sb.from('usuarios').select('*').eq('email', email).limit(1);
+    if (data && data.length){
+      savedProfile = data[0];
+      Store.setProfileEmail(email);
+      CURRENT = {screen:'perfil', perfilEmail:email};
+      render();
+    } else {
+      msg.innerHTML = '';
+      msg.appendChild(el(`<p class="error-msg">No hemos encontrado ningún perfil con ese email.</p>`));
+      const btnNuevo = el(`<button class="btn btn-outline btn-block" style="margin-top:6px;">Crear perfil nuevo con este email</button>`);
+      btnNuevo.onclick = ()=>{ CURRENT = {screen:'perfil', perfilEmail:email, perfilNuevo:true}; render(); };
+      msg.appendChild(btnNuevo);
+    }
+  }
+  box.querySelector('#gateBtn').onclick = doSearch;
+  box.querySelector('#gateEmail').addEventListener('keydown', e=>{ if (e.key==='Enter') doSearch(); });
+  return box;
+}
+
+function PerfilEditar(email){
+  const p = perfilState.profile;
+  let avatar = p.avatar_url || null;
+  const box = card(`
+    <label>Tu nombre</label>
+    <input type="text" id="pfNombre" value="${p.nombre||''}">
+    <div style="height:14px"></div>
+    <label>Tu hándicap (índice)</label>
+    <input type="number" step="0.1" id="pfHcp" value="${p.hcp!=null?p.hcp:''}">
+    <div style="height:16px"></div>
+    <label>Foto de perfil</label>
+    <div class="avatar-row">
+      <div class="avatar-circle" id="pfAvatarPreview">${avatar?`<img src="${avatar}">`:initials(p.nombre||'?')}</div>
+      <div class="avatar-opts">
+        <button class="btn btn-outline" id="pfCam">📷 Cámara</button>
+        <button class="btn btn-outline" id="pfGal">🖼️ Galería</button>
+        <input type="file" accept="image/*" capture="environment" id="pfFileCam" class="hidden">
+        <input type="file" accept="image/*" id="pfFileGal" class="hidden">
+      </div>
+    </div>
+    <div class="error-msg" id="pfErr"></div>
+    <button class="btn btn-gold btn-block" id="pfSave" style="margin-top:14px;">Guardar cambios</button>
+  `);
+  function setAvatar(url){ avatar=url; box.querySelector('#pfAvatarPreview').innerHTML = `<img src="${url}">`; }
+  box.querySelector('#pfCam').onclick = ()=> box.querySelector('#pfFileCam').click();
+  box.querySelector('#pfGal').onclick = ()=> box.querySelector('#pfFileGal').click();
+  [box.querySelector('#pfFileCam'), box.querySelector('#pfFileGal')].forEach(inp=>{
+    inp.onchange = (ev)=>{ const f=ev.target.files[0]; if(!f) return;
+      const r = new FileReader(); r.onload=()=>setAvatar(r.result); r.readAsDataURL(f); };
+  });
+  box.querySelector('#pfSave').onclick = async ()=>{
+    const nombre = box.querySelector('#pfNombre').value.trim();
+    const hcp = parseFloat(box.querySelector('#pfHcp').value);
+    if (!nombre){ box.querySelector('#pfErr').textContent='Escribe tu nombre.'; return; }
+    if (isNaN(hcp)){ box.querySelector('#pfErr').textContent='Introduce tu hándicap.'; return; }
+    const btn = box.querySelector('#pfSave');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    box.querySelector('#pfErr').textContent = '';
+    try {
+      let avatarUrl = avatar;
+      if (avatar && avatar.startsWith('data:')) avatarUrl = await uploadAvatar(avatar).catch(()=>avatar);
+      const { data, error } = await sb.from('usuarios').upsert({ email, nombre, hcp, avatar_url:avatarUrl }).select();
+      if (error) throw error;
+      perfilState.profile = data[0];
+      savedProfile = data[0];
+      Store.setProfileEmail(email);
+      btn.textContent = '✓ Guardado';
+      setTimeout(()=>{ render(); }, 700);
+    } catch(err){
+      console.error(err);
+      box.querySelector('#pfErr').textContent = 'No se pudo guardar (revisa tu conexión).';
+      btn.disabled = false; btn.textContent = 'Guardar cambios';
+    }
+  };
+  return box;
+}
+
+function PerfilHistorial(email){
+  const wrap = document.createElement('div');
+  if (perfilState.email===email && perfilState.history){
+    const h = perfilState.history;
+    if (!h.length){
+      wrap.appendChild(card(`<p class="sub" style="margin:0;">Todavía no hay partidas asociadas a este perfil.</p>`));
+      return wrap;
+    }
+    const box = card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Tus partidas (${h.length})</h3><div class="history-list"></div>`);
+    const list = box.querySelector('.history-list');
+    h.forEach(item=>{
+      const row = el(`<div class="history-item">
+        <div class="hleft">
+          <div class="hname">Partida ${item.code} — ${item.campoNombre}</div>
+          <div class="hsub">${item.status==='open'?'🟢 En curso':'🔒 Cerrada'} · ${item.golpes||0} golpes en ${item.holes} hoyos · ${item.jugadores} jugador(es)${item.modalidad==='parejas'?' · Parejas':''}</div>
+        </div>
+        <div>›</div>
+      </div>`);
+      row.onclick = ()=> openHistoryMatch(item);
+      list.appendChild(row);
+    });
+    wrap.appendChild(box);
+    return wrap;
+  }
+  wrap.appendChild(card(`<p class="sub" style="margin:0;">Cargando historial…</p>`));
+  if (!perfilState.historyLoading){
+    perfilState.historyLoading = true;
+    fetchUserHistory(email).then(history=>{
+      perfilState.history = history; perfilState.historyLoading = false;
+      if (CURRENT.screen==='perfil') render();
+    }).catch(()=>{ perfilState.historyLoading=false; });
+  }
+  return wrap;
+}
+
+function PerfilEstadisticas(email){
+  const wrap = document.createElement('div');
+  if (perfilState.email===email && perfilState.stats){
+    const stats = perfilState.stats;
+    const campoRows = Object.entries(stats.porCampo).sort((a,b)=>b[1]-a[1]);
+    const posRows = Object.entries(stats.posiciones).map(([k,v])=>[parseInt(k),v]).sort((a,b)=>a[0]-b[0]);
+
+    wrap.appendChild(card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Resumen</h3>
+      <div class="two-col">
+        <div><label>Partidas jugadas</label><div class="hole-number" style="font-size:34px;">${stats.totalPartidas}</div></div>
+        <div><label>Campos distintos</label><div class="hole-number" style="font-size:34px;">${campoRows.length}</div></div>
+      </div>`));
+
+    if (stats.totalPartidas===0){
+      wrap.appendChild(card(`<p class="sub" style="margin:0;">Todavía no hay partidas cerradas para calcular estadísticas.</p>`));
+      return wrap;
+    }
+
+    const campoCard = card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Campos más jugados</h3><div class="chart-wrap"><canvas id="campoChart" height="140"></canvas></div>`);
+    wrap.appendChild(campoCard);
+    requestAnimationFrame(()=>{
+      const ctx = campoCard.querySelector('#campoChart').getContext('2d');
+      new Chart(ctx, { type:'bar', data:{ labels:campoRows.map(r=>r[0]), datasets:[{ label:'Partidas', data:campoRows.map(r=>r[1]), backgroundColor:'#c9a24b' }] },
+        options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#f3efe2', stepSize:1}, grid:{color:'rgba(255,255,255,.06)'}}, y:{ticks:{color:'#f3efe2'}, grid:{display:false}} } } });
+    });
+
+    const posCard = card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Posiciones finales conseguidas</h3><div class="chart-wrap"><canvas id="posChart" height="140"></canvas></div>`);
+    wrap.appendChild(posCard);
+    requestAnimationFrame(()=>{
+      const ctx = posCard.querySelector('#posChart').getContext('2d');
+      new Chart(ctx, { type:'bar', data:{ labels:posRows.map(r=>'#'+r[0]), datasets:[{ label:'Veces', data:posRows.map(r=>r[1]), backgroundColor:'#3fa66b' }] },
+        options:{ plugins:{legend:{display:false}}, scales:{ y:{ticks:{color:'#f3efe2', stepSize:1}, grid:{color:'rgba(255,255,255,.06)'}}, x:{ticks:{color:'#f3efe2'}, grid:{display:false}} } } });
+    });
+
+    const btnPdf = el(`<button class="btn btn-gold btn-block" style="margin-top:6px;">📄 Descargar informe de estadísticas (PDF)</button>`);
+    const btnWa = el(`<button class="btn btn-outline btn-block" style="margin-top:10px;">📲 Enviar por WhatsApp</button>`);
+    btnPdf.onclick = ()=>{
+      const doc = buildStatsPDF(email, perfilState.profile, stats);
+      window.open(doc.output('bloburl'), '_blank');
+    };
+    btnWa.onclick = async ()=>{
+      const doc = buildStatsPDF(email, perfilState.profile, stats);
+      const blob = doc.output('blob');
+      const file = new File([blob], `golf-live-estadisticas-${email}.pdf`, {type:'application/pdf'});
+      if (navigator.canShare && navigator.canShare({files:[file]})){
+        try { await navigator.share({files:[file], title:'Mis estadísticas', text:'⛳ Mis estadísticas en Golf Live'}); }
+        catch(e){ /* el usuario canceló el share */ }
+      } else {
+        const a = document.createElement('a');
+        a.href = doc.output('bloburl'); a.download = file.name; a.click();
+        alert('Tu navegador no permite compartir el archivo directamente: se ha descargado el PDF para que lo envíes por WhatsApp a mano.');
+      }
+    };
+    wrap.appendChild(btnPdf);
+    wrap.appendChild(btnWa);
+    return wrap;
+  }
+  wrap.appendChild(card(`<p class="sub" style="margin:0;">Calculando estadísticas… (puede tardar unos segundos si tienes muchas partidas)</p>`));
+  if (!perfilState.statsLoading){
+    perfilState.statsLoading = true;
+    const historyPromise = perfilState.history ? Promise.resolve(perfilState.history) : fetchUserHistory(email);
+    historyPromise.then(history=>{
+      perfilState.history = history;
+      return computeUserStats(email, history);
+    }).then(stats=>{
+      perfilState.stats = stats; perfilState.statsLoading = false;
+      if (CURRENT.screen==='perfil') render();
+    }).catch(()=>{ perfilState.statsLoading = false; });
+  }
+  return wrap;
+}
+
+function buildStatsPDF(email, profile, stats){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const verdeOscuro = [13,58,38], verdeCampo = [21,92,57], dorado = [201,162,75], crema = [243,239,226];
+
+  doc.setFillColor(...verdeOscuro);
+  doc.rect(0,0,pageW,38,'F');
+  doc.setFillColor(...dorado);
+  doc.rect(0,38,pageW,1.4,'F');
+  doc.setTextColor(...dorado);
+  doc.setFont('helvetica','bold'); doc.setFontSize(22);
+  doc.text('GOLF LIVE', 14, 17);
+  doc.setTextColor(...crema);
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text('Informe de estadísticas', 14, 25);
+  doc.setFontSize(9);
+  doc.text(`${profile.nombre||email}   ·   ${email}`, 14, 32);
+  doc.setTextColor(20,20,20);
+
+  let y = 50;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('Resumen', 14, y); y+=8;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(`Partidas jugadas (cerradas): ${stats.totalPartidas}`, 14, y); y+=7;
+  doc.text(`Campos distintos jugados: ${Object.keys(stats.porCampo).length}`, 14, y); y+=10;
+
+  const campoRows = Object.entries(stats.porCampo).sort((a,b)=>b[1]-a[1]);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('Campos más jugados', 14, y); y+=4;
+  doc.autoTable({ startY:y, head:[['Campo','Partidas']], body: campoRows,
+    theme:'striped', headStyles:{ fillColor:verdeCampo, textColor:[255,255,255] }, styles:{fontSize:9.5}, margin:{left:14,right:14} });
+  y = doc.lastAutoTable.finalY + 10;
+
+  const posRows = Object.entries(stats.posiciones).map(([k,v])=>[parseInt(k),v]).sort((a,b)=>a[0]-b[0]).map(([k,v])=>[`Posición ${k}`,v]);
+  if (y>250){ doc.addPage(); y=20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('Posiciones finales conseguidas', 14, y); y+=4;
+  doc.autoTable({ startY:y, head:[['Posición','Veces']], body: posRows,
+    theme:'striped', headStyles:{ fillColor:verdeCampo, textColor:[255,255,255] }, styles:{fontSize:9.5}, margin:{left:14,right:14} });
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(140,140,140);
+    doc.text('Golf Live · Marcador en tiempo real', 14, pageH-8);
+    doc.text(`Página ${i} de ${pageCount}`, pageW-14, pageH-8, {align:'right'});
+  }
+  return doc;
 }
 
 /* ================= CREAR 1a: nombre del master ================= */
@@ -806,14 +1189,22 @@ function ScreenCrearNombre(){
     <div class="steps"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
     <h2 class="title">Nueva partida</h2>
     <p class="sub">Eres el master de la partida. ¿Cómo te llamas?</p>
+    <div id="lookupArea"></div>
     <label>Tu nombre</label>
-    <input type="text" id="masterName" placeholder="Ej. Vicente" value="${d.masterName||''}">
+    <input type="text" id="masterName" placeholder="Ej. Vicente" value="${d.masterName || (savedProfile?savedProfile.nombre:'') || ''}">
     <div class="error-msg" id="err"></div>
     <div class="row" style="margin-top:10px">
       <button class="btn btn-outline" id="btnBack">Atrás</button>
       <button class="btn btn-primary btn-block" id="btnNext">Aceptar</button>
     </div>
   `);
+  ProfileLookup(wrap.querySelector('#lookupArea'), (row)=>{
+    savedProfile = row;
+    Store.setProfileEmail(row.email);
+    d.masterName = row.nombre;
+    CURRENT = {screen:'crearNombre', data:d};
+    render();
+  });
   const input = wrap.querySelector('#masterName');
   wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
   wrap.querySelector('#btnNext').onclick = ()=>{
@@ -874,13 +1265,37 @@ function ScreenCrearCampo(){
     grid.appendChild(cc);
   });
   const ccOtro = el(`<div class="course-card otro" data-id="otro"><span class="plus">+</span></div>`);
-  ccOtro.onclick = ()=>{
-    d.courseId = 'otro'; d.courseName = 'Otro campo'; d.courseImg = null; d.campoRecordId = null;
+  ccOtro.onclick = ()=>{ CURRENT = {screen:'crearCampoLibre', data:d}; render(); };
+  grid.appendChild(ccOtro);
+  wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'crearNombre', data:d}; render(); };
+  return wrap;
+}
+
+/* ================= CREAR 1b-bis: nombre libre para un campo nuevo no listado ================= */
+function ScreenCrearCampoLibre(){
+  const d = CURRENT.data;
+  const wrap = card(`
+    <div class="steps"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+    <h2 class="title">Otro campo</h2>
+    <p class="sub">¿Cómo se llama el campo? Luego definiréis la tabla de hándicap a mano.</p>
+    <label>Nombre del campo</label>
+    <input type="text" id="nombreLibre" placeholder="Ej. Club de Golf Alicante">
+    <div class="error-msg" id="err"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn-outline" id="btnBack">Atrás</button>
+      <button class="btn btn-primary btn-block" id="btnNext">Continuar</button>
+    </div>
+  `);
+  const input = wrap.querySelector('#nombreLibre');
+  wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'crearCampo', data:d}; render(); };
+  wrap.querySelector('#btnNext').onclick = ()=>{
+    const nombre = input.value.trim();
+    if (!nombre){ wrap.querySelector('#err').textContent='Escribe el nombre del campo.'; return; }
+    d.courseId = 'otro'; d.courseName = nombre; d.courseImg = null; d.campoRecordId = null;
     CURRENT = {screen:'crear2', data:d};
     render();
   };
-  grid.appendChild(ccOtro);
-  wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'crearNombre', data:d}; render(); };
+  input.addEventListener('keydown', (e)=>{ if (e.key==='Enter') wrap.querySelector('#btnNext').click(); });
   return wrap;
 }
 
@@ -908,10 +1323,30 @@ function ScreenCrearRecorrido(){
 }
 
 /* ================= CREAR 2: nº hoyos / par / tabla hándicap ================= */
+/* selector Individual / Parejas, reutilizado en el paso de confirmar campo */
+function ModalidadPicker(container, d){
+  if (!d.modalidad) d.modalidad = 'individual';
+  const box = el(`<div style="margin:16px 0;">
+    <label>Modalidad</label>
+    <div class="pill-group" id="modPills"></div>
+  </div>`);
+  container.appendChild(box);
+  const pills = box.querySelector('#modPills');
+  function paint(){
+    pills.innerHTML = '';
+    [['individual','Individual'],['parejas','Parejas']].forEach(([val,label])=>{
+      const b = el(`<button type="button" class="pill-choice ${d.modalidad===val?'sel':''}">${label}</button>`);
+      b.onclick = ()=>{ d.modalidad = val; paint(); };
+      pills.appendChild(b);
+    });
+  }
+  paint();
+}
+
 function ScreenCrear2(){
   const d = CURRENT.data;
 
-  // Campos ya investigados (con par + indice de handicap oficial por hoyo en Airtable):
+  // Campos ya investigados (con par + indice de handicap oficial por hoyo):
   // se rellenan solos, sin pedir nada al usuario.
   if (d.campoRecordId && !hoyosCache.ready){
     ensureHoyosCache().then(()=>{ if (CURRENT.screen==='crear2') render(); }).catch(()=>{});
@@ -925,11 +1360,13 @@ function ScreenCrear2(){
       <h2 class="title">${d.courseName}</h2>
       <p class="sub">Datos oficiales del campo.</p>
       <div class="hoyos-ok">✓ Par y hándicap de los ${d.holes} hoyos cargados automáticamente (par total ${d.par}).</div>
+      <div id="modalidadArea"></div>
       <div class="row" style="margin-top:18px">
         <button class="btn btn-outline" id="btnBack">Atrás</button>
         <button class="btn btn-primary btn-block" id="btnNext">Continuar</button>
       </div>
     `);
+    ModalidadPicker(wrap.querySelector('#modalidadArea'), d);
     wrap.querySelector('#btnBack').onclick = ()=>{ CURRENT={screen:'crearCampo', data:d}; render(); };
     wrap.querySelector('#btnNext').onclick = ()=>{ CURRENT={screen:'crear3', data:d}; render(); };
     return wrap;
@@ -951,12 +1388,14 @@ function ScreenCrear2(){
     <div style="height:18px"></div>
     <label>Tabla de hándicap del campo</label>
     <div id="hcpArea"></div>
+    <div id="modalidadArea"></div>
     <div class="error-msg" id="err"></div>
     <div class="row" style="margin-top:10px">
       <button class="btn btn-outline" id="btnBack">Atrás</button>
       <button class="btn btn-primary btn-block" id="btnNext">Crear partida</button>
     </div>
   `);
+  ModalidadPicker(wrap.querySelector('#modalidadArea'), d);
 
   const hcpArea = wrap.querySelector('#hcpArea');
   renderHcpArea();
@@ -1085,16 +1524,77 @@ function TeeGeneroPicker(container, campoRecordId, onChange, fixedTee){
   return state;
 }
 
+/* casilla + campo de email para guardar el perfil (nombre, hcp, avatar) en Supabase,
+   reutilizado al crear partida y al unirse */
+function ProfileSaveToggle(container){
+  const box = el(`<div style="margin:14px 0;">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="chkGuardar" style="width:18px;height:18px;">
+      💾 Guardar mi perfil (para la próxima vez)
+    </label>
+    <div id="emailArea" class="hidden" style="margin-top:10px;">
+      <label>Tu email</label>
+      <input type="text" id="profileEmail" placeholder="tucorreo@ejemplo.com" value="${savedProfile?savedProfile.email:''}">
+    </div>
+  </div>`);
+  container.appendChild(box);
+  const chk = box.querySelector('#chkGuardar');
+  const emailArea = box.querySelector('#emailArea');
+  chk.onchange = ()=>{ emailArea.classList.toggle('hidden', !chk.checked); };
+  return {
+    get wanted(){ return chk.checked; },
+    get email(){ return box.querySelector('#profileEmail').value.trim(); }
+  };
+}
+
+/* enlace + email para identificarse como jugador ya registrado: busca en "usuarios"
+   y, si lo encuentra, rellena automáticamente nombre/hándicap/avatar aguas abajo
+   (vía la variable global savedProfile, que ya usan ScreenCrearNombre/Crear3/Unirse2) */
+function ProfileLookup(container, onFound){
+  const box = el(`<div style="margin-bottom:14px;">
+    <a href="javascript:void(0)" id="lookupToggle" style="color:var(--dorado-claro);font-size:13px;text-decoration:underline;">¿Ya tienes perfil? Identifícate con tu email</a>
+    <div id="lookupBox" class="hidden" style="margin-top:10px;">
+      <label>Tu email</label>
+      <div class="row">
+        <input type="text" id="lookupEmail" placeholder="tucorreo@ejemplo.com" style="flex:1;">
+        <button class="btn btn-outline" id="lookupBtn" style="white-space:nowrap;">Buscar</button>
+      </div>
+      <div id="lookupMsg" style="margin-top:8px;font-size:13px;"></div>
+    </div>
+  </div>`);
+  container.appendChild(box);
+  const toggle = box.querySelector('#lookupToggle');
+  const lookupBox = box.querySelector('#lookupBox');
+  toggle.onclick = ()=>{ lookupBox.classList.toggle('hidden'); };
+  const msg = box.querySelector('#lookupMsg');
+  box.querySelector('#lookupBtn').onclick = async ()=>{
+    const email = box.querySelector('#lookupEmail').value.trim();
+    if (!email){ msg.textContent = 'Escribe tu email.'; msg.className='error-msg'; return; }
+    msg.textContent = 'Buscando…'; msg.className='sub';
+    const { data, error } = await sb.from('usuarios').select('*').eq('email', email).limit(1);
+    if (error || !data || !data.length){
+      msg.textContent = 'No hemos encontrado ningún perfil con ese email. Puedes seguir y guardarlo como nuevo más adelante.';
+      msg.className = 'error-msg';
+      return;
+    }
+    msg.textContent = `✓ Hemos encontrado tu perfil, ${data[0].nombre}.`;
+    msg.className = 'sub';
+    onFound(data[0]);
+  };
+  return box;
+}
+
 /* ================= CREAR 3: datos del master como jugador + confirmar ================= */
 function ScreenCrear3(){
   const d = CURRENT.data;
-  if (!d.masterAvatar) d.masterAvatar = null;
+  if (!d.masterAvatar) d.masterAvatar = (savedProfile && savedProfile.avatar_url) || null;
+  const prefillHcp = (d.masterHcp!==undefined) ? d.masterHcp : (savedProfile ? savedProfile.hcp : '');
   const wrap = card(`
     <div class="steps"><div class="dot done"></div><div class="dot done"></div><div class="dot done"></div><div class="dot active"></div></div>
     <h2 class="title">Tus datos como jugador</h2>
     <p class="sub">${d.masterName}, indica tu hándicap para calcular tu resultado en la partida.</p>
     <label>Tu hándicap (índice)</label>
-    <input type="number" step="0.1" id="hcp" placeholder="Ej. 15,3">
+    <input type="number" step="0.1" id="hcp" placeholder="Ej. 15,3" value="${prefillHcp!==undefined && prefillHcp!==null ? prefillHcp : ''}">
     <div style="height:16px"></div>
     <div id="teeGeneroArea"></div>
     <label>Foto de perfil (opcional)</label>
@@ -1107,6 +1607,7 @@ function ScreenCrear3(){
         <input type="file" accept="image/*" id="fileGal" class="hidden">
       </div>
     </div>
+    <div id="profileArea"></div>
     <div class="error-msg" id="err"></div>
     <div class="row" style="margin-top:14px">
       <button class="btn btn-outline" id="btnBack">Atrás</button>
@@ -1117,6 +1618,7 @@ function ScreenCrear3(){
   if (d.campoRecordId){
     teeState = TeeGeneroPicker(wrap.querySelector('#teeGeneroArea'), d.campoRecordId, (s)=>{ teeState = {...s}; });
   }
+  const profile = ProfileSaveToggle(wrap.querySelector('#profileArea'));
   function setAvatar(url){ d.masterAvatar = url; wrap.querySelector('#avatarPreview').innerHTML = `<img src="${url}">`; }
   wrap.querySelector('#btnCam').onclick = ()=> wrap.querySelector('#fileCam').click();
   wrap.querySelector('#btnGal').onclick = ()=> wrap.querySelector('#fileGal').click();
@@ -1128,6 +1630,7 @@ function ScreenCrear3(){
   wrap.querySelector('#btnCrear').onclick = async ()=>{
     const hcp = parseFloat(wrap.querySelector('#hcp').value);
     if (isNaN(hcp)){ wrap.querySelector('#err').textContent='Introduce tu hándicap.'; return; }
+    if (profile.wanted && !profile.email){ wrap.querySelector('#err').textContent='Escribe tu email para guardar el perfil.'; return; }
     const btn = wrap.querySelector('#btnCrear');
     const originalText = btn.textContent;
     btn.disabled = true; btn.textContent = 'Creando...';
@@ -1138,35 +1641,50 @@ function ScreenCrear3(){
         hcpCampo = computeHcpCampo(d.campoRecordId, teeState.tee, teeState.genero, hcp);
       }
       if (hcpCampo === undefined || hcpCampo === null){
-        // sin datos oficiales (o campo "Otro"): flujo manual de siempre
+        // sin datos oficiales ("Otro campo"): flujo manual de siempre, guardado solo en local
         if (d.hcpMethod === 'manual' || d.hcpMethod === 'foto'){
           Store.saveCourseData(d.courseId, {ranges:d.ranges, photo:d.hcpPhoto||null});
-          Sync.saveCourseData(d.courseId, d.ranges).catch(err=>console.error('Airtable tramos:', err));
         }
         const courseData = Store.getCourseData(d.courseId) || {ranges:d.ranges};
         hcpCampo = hcpCampoFor(courseData, hcp);
       }
       const code = Store.newCode();
-      const partidaRec = await atCreate(T.partidas, {
-        Codigo: code,
-        ...(d.campoRecordId ? { Campo:[d.campoRecordId] } : {}),
-        ...(teeState ? { Tee: teeState.tee } : {}),
-        Hoyos: d.holes, Par: d.par, CreadaEn: new Date().toISOString(), Estado:'open'
-      });
-      const masterRec = await atCreate(T.jugadores, {
-        Nombre: d.masterName, Partida:[partidaRec.id], Hcp: hcp, HcpCampo: hcpCampo, EsMaster:true, HoyoActual:0
-      });
-      if (d.masterAvatar){
-        atUploadAttachment(masterRec.id, AVATAR_FIELD_ID, d.masterAvatar, 'avatar.jpg').catch(err=>console.error('Avatar upload:',err));
+      let avatarUrl = null;
+      if (d.masterAvatar) avatarUrl = d.masterAvatar.startsWith('data:') ? await uploadAvatar(d.masterAvatar).catch(()=>null) : d.masterAvatar;
+
+      const profileEmail = profile.wanted ? profile.email : null;
+      if (profileEmail){
+        const { error: errProfile } = await sb.from('usuarios').upsert({ email:profileEmail, nombre:d.masterName, hcp, avatar_url:avatarUrl });
+        if (errProfile) throw errProfile;
+        Store.setProfileEmail(profileEmail);
       }
+
+      const { data: partidaRows, error: errPartida } = await sb.from('partidas').insert({
+        code,
+        campo_id: d.campoRecordId || null,
+        campo_nombre_libre: d.campoRecordId ? null : d.courseName,
+        tee: teeState ? teeState.tee : null,
+        holes: d.holes, par: d.par, modalidad: d.modalidad || 'individual', status: 'open'
+      }).select();
+      if (errPartida) throw errPartida;
+
+      const { data: jugadorRows, error: errJugador } = await sb.from('jugadores_partida').insert({
+        partida_code: code, nombre: d.masterName, hcp, hcp_campo: hcpCampo,
+        avatar_url: avatarUrl, is_master: true, hoyo_actual: 0, golpes: new Array(d.holes).fill(null),
+        usuario_email: profileEmail
+      }).select();
+      if (errJugador) throw errJugador;
+      const masterRec = jugadorRows[0];
+
       const master = {
-        id: masterRec.id, name:d.masterName, hcp, hcpCampo, avatar:d.masterAvatar, isMaster:true,
-        holes: new Array(d.holes).fill(null), currentHole:0, _golpesIds: new Array(d.holes).fill(null)
+        id: masterRec.id, name:d.masterName, hcp, hcpCampo, avatar:avatarUrl, isMaster:true,
+        holes: new Array(d.holes).fill(null), currentHole:0
       };
       const match = {
-        _airtableId: partidaRec.id, _campoRecordId: d.campoRecordId||null,
+        _airtableId: code, _campoRecordId: d.campoRecordId||null,
         code, campoId:d.courseId, campoNombre:d.courseName, campoImagen:d.courseImg,
-        holes:d.holes, par:d.par, tee: teeState ? teeState.tee : null, createdAt: Date.now(), masterId: master.id,
+        holes:d.holes, par:d.par, tee: teeState ? teeState.tee : null, modalidad: d.modalidad||'individual',
+        createdAt: Date.now(), masterId: master.id,
         players:[master], status:'open'
       };
       Store.saveMatch(match);
@@ -1274,16 +1792,17 @@ function ScreenUnirse2(){
   } else {
     inner = `
       <h2 class="title">Tus datos</h2>
+      <div id="lookupArea"></div>
       <label>Tu nombre</label>
-      <input type="text" id="pname" placeholder="Ej. Marisa">
+      <input type="text" id="pname" placeholder="Ej. Marisa" value="${savedProfile?savedProfile.nombre:''}">
       <div style="height:14px"></div>
       <label>Tu hándicap (índice)</label>
-      <input type="number" step="0.1" id="phcp" placeholder="Ej. 22,5">
+      <input type="number" step="0.1" id="phcp" placeholder="Ej. 22,5" value="${savedProfile && savedProfile.hcp!=null ? savedProfile.hcp : ''}">
       <div style="height:16px"></div>
       <div id="teeGeneroArea"></div>
       <label>Foto de perfil (opcional)</label>
       <div class="avatar-row">
-        <div class="avatar-circle" id="avatarPreview">?</div>
+        <div class="avatar-circle" id="avatarPreview">${savedProfile && savedProfile.avatar_url ? `<img src="${savedProfile.avatar_url}">` : (savedProfile?initials(savedProfile.nombre):'?')}</div>
         <div class="avatar-opts">
           <button class="btn btn-outline" id="btnCam">📷 Cámara</button>
           <button class="btn btn-outline" id="btnGal">🖼️ Galería</button>
@@ -1291,6 +1810,7 @@ function ScreenUnirse2(){
           <input type="file" accept="image/*" id="fileGal" class="hidden">
         </div>
       </div>
+      <div id="profileArea"></div>
       <div class="error-msg" id="err"></div>
       <div class="row" style="margin-top:14px">
         <button class="btn btn-outline" id="btnBack">Atrás</button>
@@ -1315,11 +1835,17 @@ function ScreenUnirse2(){
       render();
     };
   } else {
-    let avatar = null;
+    let avatar = (savedProfile && savedProfile.avatar_url) || null;
     let teeState = null;
     if (m._campoRecordId){
       teeState = TeeGeneroPicker(wrap.querySelector('#teeGeneroArea'), m._campoRecordId, (s)=>{ teeState = {...s}; }, m.tee);
     }
+    ProfileLookup(wrap.querySelector('#lookupArea'), (row)=>{
+      savedProfile = row;
+      Store.setProfileEmail(row.email);
+      render();
+    });
+    const profile = ProfileSaveToggle(wrap.querySelector('#profileArea'));
     function setAvatar(url){ avatar=url; wrap.querySelector('#avatarPreview').innerHTML = `<img src="${url}">`; }
     wrap.querySelector('#btnCam').onclick = ()=> wrap.querySelector('#fileCam').click();
     wrap.querySelector('#btnGal').onclick = ()=> wrap.querySelector('#fileGal').click();
@@ -1333,6 +1859,7 @@ function ScreenUnirse2(){
       const hcp = parseFloat(wrap.querySelector('#phcp').value);
       if (!name){ wrap.querySelector('#err').textContent='Escribe tu nombre.'; return; }
       if (isNaN(hcp)){ wrap.querySelector('#err').textContent='Introduce tu hándicap.'; return; }
+      if (profile.wanted && !profile.email){ wrap.querySelector('#err').textContent='Escribe tu email para guardar el perfil.'; return; }
       const btn = wrap.querySelector('#btnJoin');
       const originalText = btn.textContent;
       btn.disabled = true; btn.textContent = 'Uniéndote...';
@@ -1346,16 +1873,27 @@ function ScreenUnirse2(){
           const courseData = Store.getCourseData(fresh.campoId) || {ranges:DEFAULT_HCP_RANGES};
           hcpCampo = hcpCampoFor(courseData, hcp);
         }
+        let avatarUrl = null;
+        if (avatar) avatarUrl = avatar.startsWith('data:') ? await uploadAvatar(avatar).catch(()=>null) : avatar;
         let playerId;
-        if (fresh._airtableId){
-          const rec = await atCreate(T.jugadores, { Nombre:name, Partida:[fresh._airtableId], Hcp:hcp, HcpCampo:hcpCampo, EsMaster:false, HoyoActual:0 });
-          playerId = rec.id;
-          if (avatar) atUploadAttachment(rec.id, AVATAR_FIELD_ID, avatar, 'avatar.jpg').catch(err=>console.error('Avatar upload:',err));
-        } else {
-          playerId = uid(); // partida local de demo, sin Airtable
+        const profileEmail = profile.wanted ? profile.email : null;
+        if (profileEmail){
+          const { error: errProfile } = await sb.from('usuarios').upsert({ email:profileEmail, nombre:name, hcp, avatar_url:avatarUrl });
+          if (errProfile) throw errProfile;
+          Store.setProfileEmail(profileEmail);
         }
-        const player = { id:playerId, name, hcp, hcpCampo, avatar, isMaster:false,
-          holes:new Array(fresh.holes).fill(null), currentHole:0, _golpesIds:new Array(fresh.holes).fill(null) };
+        if (fresh._airtableId){
+          const { data: rows, error } = await sb.from('jugadores_partida').insert({
+            partida_code: fresh.code, nombre:name, hcp, hcp_campo:hcpCampo, avatar_url:avatarUrl,
+            is_master:false, hoyo_actual:0, golpes:new Array(fresh.holes).fill(null), usuario_email: profileEmail
+          }).select();
+          if (error) throw error;
+          playerId = rows[0].id;
+        } else {
+          playerId = uid(); // partida local de demo, sin backend
+        }
+        const player = { id:playerId, name, hcp, hcpCampo, avatar:avatarUrl, isMaster:false,
+          holes:new Array(fresh.holes).fill(null), currentHole:0 };
         fresh.players.push(player);
         Store.saveMatch(fresh);
         CURRENT = {screen:'play', code:fresh.code, playerId:player.id};
@@ -1376,9 +1914,62 @@ function ScreenUnirse2(){
   return wrap;
 }
 
+/* ================= CHAT: comentarios en tiempo real de la partida ================= */
+function ChatPanel(match, me){
+  const box = card(`
+    <h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">💬 Comentarios</h3>
+    <div class="chat-list" id="chatList"><p class="sub" style="margin:0;">Cargando…</p></div>
+    ${match.status==='open' ? `
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Escribe un comentario…" maxlength="300">
+      <button class="btn btn-gold" id="btnChatSend">Enviar</button>
+    </div>` : ''}
+  `);
+  const list = box.querySelector('#chatList');
+  function paint(){
+    const msgs = chatCache[match.code] || [];
+    list.innerHTML = '';
+    if (!msgs.length){ list.innerHTML = '<p class="sub" style="margin:0;">Todavía no hay comentarios.</p>'; return; }
+    msgs.forEach(m=> list.appendChild(el(`<div class="chat-msg"><b>${m.nombre}</b> ${m.texto}</div>`)));
+    list.scrollTop = list.scrollHeight;
+  }
+  paint();
+  ensureChatLoaded(match.code).then(paint);
+  if (match.status==='open'){
+    const input = box.querySelector('#chatInput');
+    const send = ()=>{
+      const texto = input.value.trim();
+      if (!texto) return;
+      input.value = '';
+      sendChatMessage(match.code, me ? me.name : 'Anónimo', texto).catch(err=>console.error('Chat:',err));
+    };
+    box.querySelector('#btnChatSend').onclick = send;
+    input.addEventListener('keydown', (e)=>{ if (e.key==='Enter') send(); });
+  }
+  return box;
+}
+
 /* ================= PLAY: anotación + ranking en vivo ================= */
 let closeModalOpen = false;
 let liveScorecardOpen = false;
+let gpsWatchId = null, gpsLastCoords = null;
+
+/* ---------------- GPS caddie: distancia al green + palo sugerido (opcional, nunca bloquea la app) ---------------- */
+function haversineMeters(lat1, lng1, lat2, lng2){
+  const R = 6371000, toRad = d=>d*Math.PI/180;
+  const dLat = toRad(lat2-lat1), dLng = toRad(lng2-lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function suggestClub(m){
+  if (m>200) return 'Driver / Madera 3';
+  if (m>170) return 'Hierro 4-5';
+  if (m>140) return 'Hierro 6-7';
+  if (m>110) return 'Hierro 8-9';
+  if (m>80) return 'Pitching Wedge';
+  if (m>40) return 'Wedge de approach';
+  return 'Wedge corto / putt de approach';
+}
 
 function ScorecardGrid(match, playersOrdered){
   const hoyos = match._campoRecordId ? hoyosCache.byCampo[match._campoRecordId] : null;
@@ -1420,6 +2011,7 @@ function ScreenPlay(){
   const match = Store.getMatch(CURRENT.code);
   if (!match){ CURRENT={screen:'home'}; render(); return document.createElement('div'); }
   if (match.status === 'closed'){ CURRENT = {screen:'results', code:match.code, playerId:CURRENT.playerId}; render(); return document.createElement('div'); }
+  if (match._airtableId) subscribeMatch(match.code);
 
   const me = match.players.find(p=>p.id===CURRENT.playerId) || match.players[0];
   const holeIdx = me.currentHole || 0;
@@ -1428,18 +2020,22 @@ function ScreenPlay(){
   const topBar = el(`<div class="row" style="margin-bottom:10px;">
     <button class="btn btn-outline" id="btnMenu">← Menú principal</button>
   </div>`);
-  topBar.querySelector('#btnMenu').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  topBar.querySelector('#btnMenu').onclick = ()=>{ unsubscribeMatch(); CURRENT={screen:'home'}; render(); };
   wrap.appendChild(topBar);
   wrap.appendChild(el(`<div class="meta-chip">⛳ ${match.campoNombre}</div>`));
   wrap.appendChild(el(`<div class="meta-chip">Código: <b style="color:var(--dorado-claro)">&nbsp;${match.code}</b></div>`));
-  if (me.isMaster){
-    const shareBtn = el(`<button class="btn btn-gold" id="btnShare" style="padding:7px 12px;font-size:12.5px;margin-left:6px;">📲 Compartir por WhatsApp</button>`);
-    shareBtn.onclick = ()=>{
-      const link = location.origin + location.pathname + '?code=' + match.code;
-      const text = `⛳ ¡Únete a nuestra partida en ${match.campoNombre}! Código: ${match.code}\n${link}`;
-      window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
-    };
-    wrap.appendChild(shareBtn);
+  if (match.modalidad==='parejas') wrap.appendChild(el(`<div class="meta-chip">👥 Parejas</div>`));
+  const shareBtn = el(`<button class="btn btn-gold" id="btnShare" style="padding:7px 12px;font-size:12.5px;margin-left:6px;">📲 Compartir por WhatsApp</button>`);
+  shareBtn.onclick = ()=>{
+    const link = location.origin + location.pathname + '?code=' + match.code;
+    const text = `⛳ ¡Únete a nuestra partida en ${match.campoNombre}! Código: ${match.code}\n${link}`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  };
+  wrap.appendChild(shareBtn);
+  if (me.isMaster && match.modalidad==='parejas'){
+    const parejasBtn = el(`<button class="btn btn-outline" id="btnParejas" style="padding:7px 12px;font-size:12.5px;margin-left:6px;">👥 Agrupar parejas</button>`);
+    parejasBtn.onclick = ()=>{ unsubscribeMatch(); CURRENT = {screen:'agruparParejas', code:match.code, playerId:CURRENT.playerId}; render(); };
+    wrap.appendChild(parejasBtn);
   }
   wrap.appendChild(el(`<div style="height:14px"></div>`));
 
@@ -1448,7 +2044,10 @@ function ScreenPlay(){
   grid.appendChild(ScorePanel(match, me, holeIdx));
   wrap.appendChild(grid);
 
-  wrap.appendChild(el(`<footer class="hint">El ranking se sincroniza en vivo entre todos los jugadores vía Airtable (cada 6s, o pulsa Actualizar).</footer>`));
+  wrap.appendChild(el(`<div style="height:16px"></div>`));
+  wrap.appendChild(ChatPanel(match, me));
+
+  wrap.appendChild(el(`<footer class="hint">El ranking se sincroniza en vivo entre todos los jugadores (en tiempo real, o pulsa Actualizar).</footer>`));
 
   if (closeModalOpen) wrap.appendChild(CloseModal(match));
   if (liveScorecardOpen) wrap.appendChild(LiveScorecardModal(match));
@@ -1460,19 +2059,115 @@ function ScreenSpectate(){
   const match = Store.getMatch(CURRENT.code);
   if (!match){ CURRENT={screen:'home'}; render(); return document.createElement('div'); }
   if (match.status === 'closed'){ CURRENT = {screen:'results', code:match.code, playerId:null}; render(); return document.createElement('div'); }
+  if (match._airtableId) subscribeMatch(match.code);
 
   const wrap = document.createElement('div');
   const topBar = el(`<div class="row" style="margin-bottom:10px;">
     <button class="btn btn-outline" id="btnMenu">← Menú principal</button>
   </div>`);
-  topBar.querySelector('#btnMenu').onclick = ()=>{ CURRENT={screen:'home'}; render(); };
+  topBar.querySelector('#btnMenu').onclick = ()=>{ unsubscribeMatch(); CURRENT={screen:'home'}; render(); };
   wrap.appendChild(topBar);
   wrap.appendChild(el(`<div class="meta-chip">⛳ ${match.campoNombre}</div>`));
   wrap.appendChild(el(`<div class="meta-chip">👀 Modo espectador</div>`));
   wrap.appendChild(el(`<div style="height:14px"></div>`));
   wrap.appendChild(RankPanel(match, {id:'__spectator__'}));
-  wrap.appendChild(el(`<footer class="hint">El ranking se sincroniza en vivo entre todos los jugadores vía Airtable (cada 6s, o pulsa Actualizar).</footer>`));
+  wrap.appendChild(el(`<div style="height:16px"></div>`));
+  wrap.appendChild(ChatPanel(match, null));
+  wrap.appendChild(el(`<footer class="hint">El ranking se sincroniza en vivo entre todos los jugadores (en tiempo real, o pulsa Actualizar).</footer>`));
   return wrap;
+}
+
+/* ================= PAREJAS: agrupar jugadores (toca dos para emparejar) ================= */
+let selectedForPareja = null;
+function ScreenAgruparParejas(){
+  const match = Store.getMatch(CURRENT.code);
+  if (!match){ CURRENT={screen:'home'}; render(); return document.createElement('div'); }
+  const wrap = document.createElement('div');
+  const topBar = el(`<div class="row" style="margin-bottom:10px;">
+    <button class="btn btn-outline" id="btnBack">← Volver a la partida</button>
+  </div>`);
+  topBar.querySelector('#btnBack').onclick = ()=>{ selectedForPareja=null; CURRENT={screen:'play', code:match.code, playerId:CURRENT.playerId}; render(); };
+  wrap.appendChild(topBar);
+  wrap.appendChild(card(`<h2 class="title">👥 Agrupar parejas</h2><p class="sub">Toca dos jugadores para emparejarlos. Toca un jugador ya emparejado para deshacer su pareja.</p>`));
+
+  const groups = {};
+  const sinPareja = [];
+  match.players.forEach(p=>{
+    if (p.pareja!==null && p.pareja!==undefined){
+      if (!groups[p.pareja]) groups[p.pareja] = [];
+      groups[p.pareja].push(p);
+    } else sinPareja.push(p);
+  });
+
+  const parejasCard = card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Parejas formadas</h3><div id="parejasList"></div>`);
+  const parejasList = parejasCard.querySelector('#parejasList');
+  const keys = Object.keys(groups);
+  if (keys.length===0) parejasList.appendChild(el(`<p class="sub" style="margin:0;">Todavía no hay parejas formadas.</p>`));
+  keys.forEach(k=>{
+    const slot = el(`<div class="pareja-slot"><h4>Pareja ${k}</h4><div></div></div>`);
+    const chipsWrap = slot.querySelector('div');
+    groups[k].forEach(p=>{
+      const chip = el(`<span class="player-chip picked"><span class="mini-avatar">${p.avatar?`<img src="${p.avatar}">`:initials(p.name)}</span>${p.name}</span>`);
+      chip.onclick = ()=> unpairPlayer(match, p);
+      chipsWrap.appendChild(chip);
+    });
+    parejasList.appendChild(slot);
+  });
+  wrap.appendChild(parejasCard);
+
+  const solosCard = card(`<h3 style="font-family:'Bebas Neue';font-size:16px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Sin emparejar</h3><div id="solosList"></div>`);
+  const solosList = solosCard.querySelector('#solosList');
+  if (sinPareja.length===0) solosList.appendChild(el(`<p class="sub" style="margin:0;">Todos los jugadores están emparejados.</p>`));
+  sinPareja.forEach(p=>{
+    const chip = el(`<span class="player-chip ${selectedForPareja===p.id?'picked':''}"><span class="mini-avatar">${p.avatar?`<img src="${p.avatar}">`:initials(p.name)}</span>${p.name}</span>`);
+    chip.onclick = ()=> pickForPareja(match, p);
+    solosList.appendChild(chip);
+  });
+  wrap.appendChild(solosCard);
+  return wrap;
+}
+function pickForPareja(match, p){
+  if (selectedForPareja===null){ selectedForPareja = p.id; render(); return; }
+  if (selectedForPareja===p.id){ selectedForPareja = null; render(); return; }
+  const first = match.players.find(x=>x.id===selectedForPareja);
+  selectedForPareja = null;
+  if (!first){ render(); return; }
+  const existing = match.players.map(x=>parseInt(x.pareja)).filter(n=>!isNaN(n));
+  const num = existing.length ? Math.max(...existing)+1 : 1;
+  first.pareja = num; p.pareja = num;
+  Store.saveMatch(match);
+  render();
+  if (match._airtableId){
+    Sync.savePareja(first, num).catch(err=>console.error('Pareja:',err));
+    Sync.savePareja(p, num).catch(err=>console.error('Pareja:',err));
+  }
+}
+function unpairPlayer(match, p){
+  p.pareja = null;
+  Store.saveMatch(match);
+  render();
+  if (match._airtableId){
+    Sync.savePareja(p, null).catch(err=>console.error('Pareja:',err));
+  }
+}
+
+/* agrupa jugadores por pareja y suma sus resultados netos (modo Parejas) */
+function rankParejas(match, players){
+  const groups = {};
+  players.forEach(p=>{
+    const key = (p.pareja!==null && p.pareja!==undefined) ? ('g'+p.pareja) : ('solo'+p.id);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  });
+  const rows = Object.values(groups).map(members=>{
+    const results = members.map(p=>finalResult(match,p));
+    const strokes = results.reduce((s,r)=>s+r.strokes,0);
+    const net = results.reduce((s,r)=>s+r.net,0);
+    const diff = net - match.par*members.length;
+    return { members, strokes, net, diff };
+  });
+  rows.sort((a,b)=> a.diff - b.diff);
+  return rows;
 }
 
 function RankPanel(match, me){
@@ -1480,12 +2175,44 @@ function RankPanel(match, me){
     <div class="rank-header"><h3>Ranking en vivo</h3>
       <button class="refresh-btn" id="refreshBtn">⟳ Actualizar</button>
     </div>
+    ${match.modalidad==='parejas' ? '<div id="parejasRows" style="margin-bottom:10px;"></div>' : ''}
     <div id="rows"></div>
   </div>`);
   panel.querySelector('#refreshBtn').onclick = async ()=>{
     if (match._airtableId){ await pullAndMerge(match.code).catch(err=>console.error(err)); }
     render();
   };
+  if (match.modalidad==='parejas'){
+    const pRowsWrap = panel.querySelector('#parejasRows');
+    const groups = {};
+    match.players.forEach(p=>{
+      const key = (p.pareja!==null && p.pareja!==undefined) ? ('g'+p.pareja) : ('solo'+p.id);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(p);
+    });
+    const pRows = Object.values(groups).map(members=>{
+      const results = members.map(p=>liveResult(match,p));
+      const strokes = results.reduce((s,r)=>s+r.strokes,0);
+      const diff = results.reduce((s,r)=>s+r.diff,0);
+      const played = Math.min(...results.map(r=>r.played));
+      return { members, strokes, diff, played };
+    }).sort((a,b)=> a.diff-b.diff);
+    pRows.forEach((row,idx)=>{
+      const first = row.members[0];
+      pRowsWrap.appendChild(el(`
+        <div class="player-row ${row.members.some(m=>m.id===me.id)?'you-row':''}">
+          <div class="pos-num">${idx+1}</div>
+          <div class="mini-avatar">${first.avatar?`<img src="${first.avatar}">`:initials(first.name)}</div>
+          <div>
+            <div class="p-name">👥 ${row.members.map(m=>m.name).join(' & ')}</div>
+            <div class="p-sub">Hoyo ${row.played}/${match.holes}</div>
+          </div>
+          <div class="p-total">${row.strokes||0}</div>
+          <div class="p-diff ${diffClass(row.diff)}">${row.played? fmtDiff(row.diff) : '—'}</div>
+        </div>
+      `));
+    });
+  }
   const rows = panel.querySelector('#rows');
   const ranked = rankPlayers(match, match.players, true);
   ranked.forEach((row,idx)=>{
@@ -1541,12 +2268,50 @@ function ScorePanel(match, me, holeIdx){
     <div class="result-msg ${resultInfo?resultInfo.cls:''}" id="resultMsg">${resultInfo ? `${resultInfo.label} — ${resultInfo.msg}` : ''}</div>
     <button class="btn btn-red btn-block btn-lg" id="btnRegistrar">Registrar</button>
     <button class="btn btn-outline btn-block" id="btnVerTodos" style="margin-top:10px;">📋 Ver golpes por hoyo de todos</button>
+    <div class="gps-box" id="gpsBox">
+      <button class="btn btn-outline btn-block" id="btnGps">📍 ${gpsWatchId ? 'Desactivar GPS caddie' : 'Activar GPS caddie'}</button>
+      <div id="gpsResult"></div>
+    </div>
     <div class="strip-wrap" id="stripWrap"></div>
     <div class="stats-row" id="statsRow"></div>
-    ${me.isMaster ? `<div class="close-master"><button class="btn btn-gold btn-block" id="btnCerrar" ${holeIdx!==match.holes-1 || (me.holes[match.holes-1]===null||me.holes[match.holes-1]===undefined) ? 'disabled':''}>Cerrar partida</button>
-      <div class="demo-note">Solo el master puede cerrar, y únicamente tras registrar el hoyo ${match.holes}.</div></div>` : ''}
+    ${(()=>{
+      if (!me.isMaster) return '';
+      const jugado = holesPlayedCount(me);
+      const puedeCerrar = jugado >= match.holes;
+      return `<div class="close-master">
+        <button class="btn btn-gold btn-block" id="btnCerrar" ${puedeCerrar?'':'disabled'}>Cerrar partida</button>
+        ${puedeCerrar
+          ? `<div class="demo-note">Solo el master puede cerrar la partida.</div>`
+          : `<div class="error-msg" style="text-align:center;margin-top:10px;">Debes registrar tus ${match.holes} hoyos antes de poder cerrar la partida (llevas ${jugado}/${match.holes}).</div>`}
+      </div>`;
+    })()}
   </div>`);
   panel.querySelector('#btnVerTodos').onclick = ()=>{ liveScorecardOpen = true; render(); };
+
+  const gpsResult = panel.querySelector('#gpsResult');
+  const hasGreenCoords = hoyoOficial && hoyoOficial.lat!=null && hoyoOficial.lng!=null;
+  function updateGpsUI(){
+    if (!gpsWatchId){ gpsResult.innerHTML=''; return; }
+    if (!hasGreenCoords){ gpsResult.innerHTML = '<p class="sub" style="margin:10px 0 0;">Próximamente para este campo (aún no hay coordenadas del green cargadas).</p>'; return; }
+    if (!gpsLastCoords){ gpsResult.innerHTML = '<p class="sub" style="margin:10px 0 0;">Buscando tu posición…</p>'; return; }
+    const dist = Math.round(haversineMeters(gpsLastCoords.lat, gpsLastCoords.lng, hoyoOficial.lat, hoyoOficial.lng));
+    gpsResult.innerHTML = `<div class="gps-dist">${dist} m</div><div class="gps-club">Palo sugerido: ${suggestClub(dist)}</div>`;
+  }
+  panel.querySelector('#btnGps').onclick = (e)=>{
+    if (gpsWatchId){
+      navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId = null; gpsLastCoords = null;
+      e.target.textContent = '📍 Activar GPS caddie'; updateGpsUI(); return;
+    }
+    if (!navigator.geolocation){ gpsResult.innerHTML = '<p class="error-msg">Tu navegador no permite geolocalización.</p>'; return; }
+    e.target.textContent = '📍 Desactivar GPS caddie';
+    gpsWatchId = navigator.geolocation.watchPosition(
+      pos=>{ gpsLastCoords = { lat:pos.coords.latitude, lng:pos.coords.longitude }; updateGpsUI(); },
+      err=>{ console.error('GPS:',err); gpsResult.innerHTML = '<p class="error-msg">No se pudo acceder a tu ubicación (revisa el permiso).</p>'; },
+      { enableHighAccuracy:true, maximumAge:5000 }
+    );
+    updateGpsUI();
+  };
+  updateGpsUI();
 
   const stripWrap = panel.querySelector('#stripWrap');
   const hoyoCells = Array.from({length:match.holes},(_,i)=>`<td>${i+1}</td>`).join('');
@@ -1594,10 +2359,10 @@ function ScorePanel(match, me, holeIdx){
     if (m._airtableId && change){
       markMineDirty();
       if (change.holeIdx !== undefined){
-        Sync.saveHole(m.code, me, change.holeIdx, change.strokes).catch(err=>console.error('Airtable golpe:',err));
+        Sync.saveHole(m.code, me).catch(err=>console.error('Supabase golpe:',err));
       }
       if (change.currentHole !== undefined){
-        Sync.saveCurrentHole(me, change.currentHole).catch(err=>console.error('Airtable hoyo actual:',err));
+        Sync.saveCurrentHole(me, change.currentHole).catch(err=>console.error('Supabase hoyo actual:',err));
       }
     }
   }
@@ -1642,44 +2407,242 @@ let resultsTab = 'clasificacion';
 const compareSelection = new Set();
 
 /* ---- generación del informe PDF ---- */
-function buildReportPDF(match, ranked, comentarios){
+/* descarga una imagen (avatar) y la convierte a data URL para poder incrustarla en el PDF;
+   null si falla (CORS, sin avatar, etc.) — el dibujo de avatar cae entonces a las iniciales */
+async function imageUrlToDataURL(url){
+  if (!url) return null;
+  try{
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve,reject)=>{
+      const r = new FileReader();
+      r.onload = ()=>resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  } catch(e){ return null; }
+}
+function detectImgFormat(dataUrl){
+  if (!dataUrl) return 'PNG';
+  if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+  if (dataUrl.startsWith('data:image/webp')) return 'WEBP';
+  return 'PNG';
+}
+/* dibuja un avatar circular (con recorte si el motor de jsPDF lo permite) o, si no hay foto,
+   un círculo de color con las iniciales del jugador */
+function drawAvatarChip(doc, cx, cy, r, dataUrl, name, ringColor){
+  if (dataUrl){
+    try{
+      doc.saveGraphicsState();
+      doc.circle(cx, cy, r-0.4, null);
+      doc.clip();
+      doc.discardPath();
+      doc.addImage(dataUrl, detectImgFormat(dataUrl), cx-r, cy-r, r*2, r*2);
+      doc.restoreGraphicsState();
+      doc.setDrawColor(...ringColor); doc.setLineWidth(0.9);
+      doc.circle(cx, cy, r, 'S');
+      return;
+    } catch(e){ /* cae a iniciales */ }
+  }
+  doc.setFillColor(...ringColor);
+  doc.circle(cx, cy, r, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(Math.max(7, r*2.1));
+  doc.text(initials(name||'?'), cx, cy + r*0.35, {align:'center'});
+}
+/* pequeña pelota de golf dibujada a mano (sin depender de ninguna imagen externa) */
+function drawGolfBallIcon(doc, cx, cy, r){
+  doc.setFillColor(255,255,255);
+  doc.setDrawColor(201,162,75); doc.setLineWidth(0.6);
+  doc.circle(cx, cy, r, 'FD');
+  doc.setFillColor(180,180,180);
+  const dimples = [[-0.4,-0.3],[0.3,-0.4],[0,0],[-0.3,0.4],[0.4,0.3],[-0.1,-0.6],[0.5,0]];
+  dimples.forEach(([dx,dy])=> doc.circle(cx+dx*r, cy+dy*r, r*0.11, 'F'));
+}
+/* renderiza (fuera de pantalla) el gráfico de evolución del ranking por hoyo como PNG,
+   en tema claro para que se lea bien impreso a página completa */
+function renderEvolutionChartPNG(match){
+  const canvas = document.createElement('canvas');
+  const W = 1980, H = 1400;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
+  const posSeries = positionsPerHole(match);
+  const palette = ['#b8863c','#2f8f5b','#c0392b','#2f7fc1','#9b59b6','#c98a12','#16a085','#d6336c'];
+  const labels = Array.from({length:match.holes}, (_,i)=>'H'+(i+1));
+  const datasets = match.players.map((p,idx)=>{
+    const series = posSeries[p.id];
+    const dataMap = {}; series.forEach(s=> dataMap[s.hole]=s.pos);
+    return { label:p.name, data: labels.map((_,i)=> dataMap[i+1] ?? null), borderColor: palette[idx%palette.length],
+      backgroundColor:'transparent', spanGaps:true, tension:.3, pointRadius:5, borderWidth:3 };
+  });
+  const whiteBgPlugin = { id:'whiteBg', beforeDraw:(c)=>{ c.ctx.save(); c.ctx.fillStyle='#ffffff'; c.ctx.fillRect(0,0,c.width,c.height); c.ctx.restore(); } };
+  const chart = new Chart(ctx, {
+    type:'line', data:{ labels, datasets },
+    plugins:[whiteBgPlugin],
+    options:{
+      responsive:false, animation:false, devicePixelRatio:1,
+      scales:{
+        y:{ reverse:true, ticks:{stepSize:1, color:'#222', font:{size:22}}, grid:{color:'#e8e8e8'} },
+        x:{ ticks:{color:'#222', font:{size:18}}, grid:{color:'#f2f2f2'} }
+      },
+      plugins:{ legend:{ position:'bottom', labels:{color:'#222', boxWidth:22, font:{size:20}} } }
+    }
+  });
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  chart.destroy();
+  return dataUrl;
+}
+
+async function buildReportPDF(match, ranked, comentarios){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-  let y = 16;
-  doc.setFontSize(18); doc.text('Golf Live — Informe de partida', 14, y); y+=9;
-  doc.setFontSize(11);
-  doc.text(`Campo: ${match.campoNombre}`, 14, y); y+=6;
-  doc.text(`Fecha: ${new Date(match.createdAt).toLocaleDateString('es-ES')}`, 14, y); y+=6;
-  doc.text(`Código: ${match.code}`, 14, y); y+=10;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const verdeOscuro = [13,58,38], verdeCampo = [21,92,57], dorado = [201,162,75], crema = [243,239,226];
+  const oro=[201,162,75], plata=[176,176,180], bronce=[176,124,77];
 
-  doc.setFontSize(14); doc.text('Clasificación', 14, y); y+=7;
-  doc.setFontSize(10);
-  ranked.forEach((row,idx)=>{
-    doc.text(`${idx+1}. ${row.p.name} — ${row.extra.strokes} golpes — ${fmtDiff(row.diff)}`, 14, y);
-    y+=6;
-  });
+  const avatarByPlayerId = {};
+  await Promise.all(ranked.map(async row=>{
+    avatarByPlayerId[row.p.id] = await imageUrlToDataURL(row.p.avatar);
+  }));
 
-  y+=6;
-  if (y>250){ doc.addPage(); y=16; }
-  doc.setFontSize(14); doc.text('Golpes por hoyo', 14, y); y+=7;
-  doc.setFontSize(7.5);
-  const colW = match.holes>18?7:8, x0=14, nameW=28;
-  doc.text('Jugador', x0, y);
-  for (let h=0; h<match.holes; h++){ doc.text(String(h+1), x0+nameW+h*colW, y); }
-  y+=5;
-  ranked.forEach(row=>{
-    if (y>285){ doc.addPage(); y=16; }
-    doc.text((row.p.name||'').slice(0,14), x0, y);
-    row.p.holes.forEach((val,h)=>{ doc.text(val!=null?String(val):'-', x0+nameW+h*colW, y); });
-    y+=5;
+  const HEADER_H = 66;
+  function header(){
+    doc.setFillColor(...verdeOscuro);
+    doc.rect(0,0,pageW,HEADER_H,'F');
+    doc.setFillColor(...dorado);
+    doc.rect(0,HEADER_H,pageW,1.4,'F');
+    doc.setTextColor(...dorado);
+    doc.setFont('helvetica','bold'); doc.setFontSize(20);
+    doc.text('GOLF LIVE', 14, 15);
+    doc.setTextColor(...crema);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text('Informe de partida', 14, 22);
+    doc.setFontSize(8.5);
+    doc.text(`${match.campoNombre}   ·   ${new Date(match.createdAt).toLocaleDateString('es-ES')}   ·   Código ${match.code}`, 14, 28);
+    drawGolfBallIcon(doc, pageW-16, 14, 7);
+
+    // podio con los 3 primeros (avatar, nombre y resultado)
+    const podio = [ranked[1], ranked[0], ranked[2]];
+    const cx0 = pageW/2;
+    const offsets = [-30, 0, 30];
+    const radii = [7, 9, 7];
+    const rings = [plata, oro, bronce];
+    const cy = 42;
+    const maxR = 9;
+    podio.forEach((row,i)=>{
+      if (!row) return;
+      const cx = cx0 + offsets[i];
+      const r = radii[i];
+      drawAvatarChip(doc, cx, cy, r, avatarByPlayerId[row.p.id], row.p.name, rings[i]);
+      doc.setTextColor(...crema);
+      doc.setFont('helvetica','bold'); doc.setFontSize(8);
+      doc.text(row.p.name, cx, cy+maxR+6, {align:'center', maxWidth:40});
+      const diffColor = row.diff===0 ? dorado : (row.diff>0 ? [255,138,128] : [127,227,163]);
+      doc.setTextColor(...diffColor);
+      doc.setFontSize(8.5);
+      doc.text(fmtDiff(row.diff), cx, cy+maxR+11, {align:'center'});
+    });
+    doc.setTextColor(20,20,20);
+  }
+  header();
+  let y = HEADER_H + 8;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('Clasificación final', 14, y);
+  y += 4;
+  doc.autoTable({
+    startY: y,
+    head: [['','#','Jugador','Hcp.','Hcp. campo','Golpes','Resultado']],
+    body: ranked.map((row,idx)=>[
+      '', idx+1, row.p.name + (row.p.isMaster?' (master)':''), row.p.hcp, row.p.hcpCampo, row.extra.strokes, fmtDiff(row.diff)
+    ]),
+    theme: 'grid',
+    headStyles: { fillColor: verdeCampo, textColor: [255,255,255], fontStyle:'bold', fontSize:8.5 },
+    alternateRowStyles: { fillColor: [227,242,232] },
+    styles: { fontSize: 8.5, cellPadding: 2, minCellHeight: 8, lineColor:[210,220,213], lineWidth:0.2 },
+    columnStyles: { 0: { cellWidth: 11 } },
+    margin: { left:14, right:14 },
+    didDrawCell: (data)=>{
+      if (data.section==='body' && data.column.index===0){
+        const row = ranked[data.row.index];
+        const cx = data.cell.x + data.cell.width/2;
+        const cy = data.cell.y + data.cell.height/2;
+        const r = Math.min(data.cell.width, data.cell.height)/2 - 1;
+        const ring = data.row.index===0?oro:(data.row.index===1?plata:(data.row.index===2?bronce:verdeCampo));
+        drawAvatarChip(doc, cx, cy, r, avatarByPlayerId[row.p.id], row.p.name, ring);
+      }
+    }
   });
+  y = doc.lastAutoTable.finalY + 6;
+
+  if (y > 270){ doc.addPage(); y = 20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text('Golpes por hoyo', 14, y);
+  y += 4;
+
+  const hoyosData = match._campoRecordId ? hoyosCache.byCampo[match._campoRecordId] : null;
+  const pares = (hoyosData && hoyosData.length===match.holes) ? hoyosData.map(h=>h.par) : new Array(match.holes).fill(Math.round(match.par/match.holes));
+  const holeHead = ['Jugador', ...Array.from({length:match.holes},(_,i)=>String(i+1)), 'Total'];
+  const parTotalRow = ['Par', ...pares, pares.reduce((s,p)=>s+p,0)];
+  const bodyRows = ranked.map(row=>[
+    row.p.name, ...row.p.holes.map(h=> h!=null? h : '-'), strokesSum(row.p)
+  ]);
+  doc.autoTable({
+    startY: y,
+    head: [holeHead],
+    body: [parTotalRow, ...bodyRows],
+    theme: 'grid',
+    headStyles: { fillColor: [231,222,196], textColor:[20,20,20], fontSize:6.3, halign:'center', fontStyle:'bold' },
+    styles: { fontSize:6.3, cellPadding:1.1, halign:'center', textColor:[30,30,30] },
+    columnStyles: { 0: { halign:'left', fontStyle:'bold', cellWidth: 24 } },
+    margin: { left:14, right:14 },
+    didParseCell: (data)=>{
+      if (data.section!=='body') return;
+      if (data.row.index===0){ data.cell.styles.fillColor = [231,222,196]; data.cell.styles.fontStyle='bold'; return; }
+      const colIdx = data.column.index;
+      if (colIdx>=1 && colIdx<=match.holes){
+        const val = parseInt(data.cell.raw);
+        const par = pares[colIdx-1];
+        if (!isNaN(val)){
+          if (val<par) data.cell.styles.textColor = [39,127,77];
+          else if (val>par) data.cell.styles.textColor = [176,42,30];
+        }
+      }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 10;
 
   if (comentarios && comentarios.trim()){
-    y+=8;
-    if (y>260){ doc.addPage(); y=16; }
-    doc.setFontSize(12); doc.text('Comentarios', 14, y); y+=6;
-    doc.setFontSize(10);
-    doc.text(doc.splitTextToSize(comentarios, 180), 14, y);
+    if (y > 265){ doc.addPage(); y = 20; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(20,20,20);
+    doc.text('Comentarios', 14, y); y += 6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.text(doc.splitTextToSize(comentarios, pageW-28), 14, y);
+  }
+
+  // pagina 2 dedicada, en horizontal, a la evolucion del ranking por hoyo
+  doc.addPage('a4', 'landscape');
+  const pageW2 = doc.internal.pageSize.getWidth();
+  const pageH2 = doc.internal.pageSize.getHeight();
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20,20,20);
+  doc.text('Evolución del ranking por hoyo', 14, 16);
+  const evoImg = renderEvolutionChartPNG(match);
+  const maxW = pageW2-24, maxH = pageH2-28;
+  const ratio = 1980/1400;
+  let imgW = maxW, imgH = imgW/ratio;
+  if (imgH > maxH){ imgH = maxH; imgW = imgH*ratio; }
+  doc.addImage(evoImg, 'JPEG', (pageW2-imgW)/2, 22, imgW, imgH);
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    const w = doc.internal.pageSize.getWidth(), h = doc.internal.pageSize.getHeight();
+    doc.setFontSize(8); doc.setTextColor(140,140,140);
+    doc.text('Golf Live · Marcador en tiempo real', 14, h-8);
+    doc.text(`Página ${i} de ${pageCount}`, w-14, h-8, {align:'right'});
   }
   return doc;
 }
@@ -1698,6 +2661,8 @@ function ScreenResults(){
   </div>`));
 
   const ranked = rankPlayers(match, match.players, false);
+  const esParejas = match.modalidad==='parejas';
+  const rankedParejas = esParejas ? rankParejas(match, match.players) : null;
 
   const top = card(`
     <div class="row" style="justify-content:space-between;align-items:flex-start;">
@@ -1711,18 +2676,33 @@ function ScreenResults(){
   `);
   const podiumEl = top.querySelector('#podium');
   const order = [1,0,2]; // 2º-1º-3º visualmente
-  order.forEach(i=>{
-    const row = ranked[i]; if(!row) return;
-    const p = row.p;
-    podiumEl.appendChild(el(`
-      <div class="pod-slot pod-${i+1}">
-        <div class="mini-avatar" style="width:56px;height:56px;">${p.avatar?`<img src="${p.avatar}">`:initials(p.name)}</div>
-        <div class="bar">${i+1}</div>
-        <div class="pname">${p.name}</div>
-        <div class="presult">${fmtDiff(row.diff)}</div>
-      </div>
-    `));
-  });
+  if (esParejas){
+    order.forEach(i=>{
+      const row = rankedParejas[i]; if(!row) return;
+      const first = row.members[0];
+      podiumEl.appendChild(el(`
+        <div class="pod-slot pod-${i+1}">
+          <div class="mini-avatar" style="width:56px;height:56px;">${first.avatar?`<img src="${first.avatar}">`:initials(first.name)}</div>
+          <div class="bar">${i+1}</div>
+          <div class="pname">${row.members.map(m=>m.name).join(' & ')}</div>
+          <div class="presult">${fmtDiff(row.diff)}</div>
+        </div>
+      `));
+    });
+  } else {
+    order.forEach(i=>{
+      const row = ranked[i]; if(!row) return;
+      const p = row.p;
+      podiumEl.appendChild(el(`
+        <div class="pod-slot pod-${i+1}">
+          <div class="mini-avatar" style="width:56px;height:56px;">${p.avatar?`<img src="${p.avatar}">`:initials(p.name)}</div>
+          <div class="bar">${i+1}</div>
+          <div class="pname">${p.name}</div>
+          <div class="presult">${fmtDiff(row.diff)}</div>
+        </div>
+      `));
+    });
+  }
   wrap.appendChild(top);
 
   const tabs = el(`<div class="tabs">
@@ -1734,31 +2714,30 @@ function ScreenResults(){
   tabs.querySelectorAll('.tab-btn').forEach(b=> b.onclick = ()=>{ resultsTab=b.dataset.t; render(); });
   wrap.appendChild(tabs);
 
-  if (resultsTab==='clasificacion') wrap.appendChild(ClasificacionTable(match, ranked));
+  if (resultsTab==='clasificacion') wrap.appendChild(ClasificacionTable(match, ranked, rankedParejas));
   if (resultsTab==='detalle') wrap.appendChild(DetalleJugador(match, ranked));
   if (resultsTab==='comparativa') wrap.appendChild(ComparativaTab(match, ranked));
   if (resultsTab==='analisis') wrap.appendChild(AnalisisPartida(match, ranked));
 
-  const comentariosCard = card(`
-    <h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">Comentarios de la partida</h3>
-    <textarea class="comments" id="comentariosTxt" placeholder="Anécdotas, apuestas, lo que queráis recordar de esta ronda...">${match.comentarios||''}</textarea>
-  `);
-  wrap.appendChild(comentariosCard);
-  const comentariosTxt = comentariosCard.querySelector('#comentariosTxt');
-  comentariosTxt.onblur = ()=>{
-    const val = comentariosTxt.value;
-    if (val === (match.comentarios||'')) return;
-    match.comentarios = val;
-    Store.saveMatch(match);
-    if (match._airtableId) atUpdate(T.partidas, match._airtableId, {Comentarios: val}).catch(err=>console.error('Airtable comentarios:',err));
-  };
+  wrap.appendChild(ChatPanel(match, match.players.find(p=>p.id===CURRENT.playerId)));
 
-  top.querySelector('#btnInforme').onclick = ()=>{
-    const doc = buildReportPDF(match, ranked, comentariosTxt.value);
-    window.open(doc.output('bloburl'), '_blank');
+  function chatAsText(){
+    const msgs = chatCache[match.code] || [];
+    return msgs.map(m=>`${m.nombre}: ${m.texto}`).join('\n');
+  }
+  top.querySelector('#btnInforme').onclick = async ()=>{
+    const btn = top.querySelector('#btnInforme');
+    const original = btn.textContent; btn.textContent = 'Generando…'; btn.disabled = true;
+    try {
+      const doc = await buildReportPDF(match, ranked, chatAsText());
+      window.open(doc.output('bloburl'), '_blank');
+    } finally { btn.textContent = original; btn.disabled = false; }
   };
   top.querySelector('#btnWhatsappPDF').onclick = async ()=>{
-    const doc = buildReportPDF(match, ranked, comentariosTxt.value);
+    const btn = top.querySelector('#btnWhatsappPDF');
+    const original = btn.textContent; btn.textContent = 'Generando…'; btn.disabled = true;
+    const doc = await buildReportPDF(match, ranked, chatAsText());
+    btn.textContent = original; btn.disabled = false;
     const blob = doc.output('blob');
     const file = new File([blob], `golf-live-${match.code}.pdf`, {type:'application/pdf'});
     if (navigator.canShare && navigator.canShare({files:[file]})){
@@ -1774,7 +2753,7 @@ function ScreenResults(){
   return wrap;
 }
 
-function ClasificacionTable(match, ranked){
+function ClasificacionTable(match, ranked, rankedParejas){
   const rows = ranked.map((row,idx)=>{
     const p=row.p;
     return `<tr>
@@ -1787,6 +2766,18 @@ function ClasificacionTable(match, ranked){
     </tr>`;
   }).join('');
   const wrap = document.createElement('div');
+  if (rankedParejas){
+    const prows = rankedParejas.map((row,idx)=>`<tr>
+      <td>${idx+1}</td>
+      <td>${row.members.map(m=>m.name).join(' & ')}</td>
+      <td>${row.strokes}</td>
+      <td class="${diffClass(row.diff)}" style="font-weight:700">${fmtDiff(row.diff)}</td>
+    </tr>`).join('');
+    wrap.appendChild(card(`<h3 style="font-family:'Bebas Neue';font-size:18px;letter-spacing:.5px;margin:0 0 10px;color:var(--dorado-claro);">👥 Clasificación por parejas</h3>
+      <table class="results-table">
+        <thead><tr><th>#</th><th>Pareja</th><th>Golpes</th><th>Resultado (suma neto)</th></tr></thead>
+        <tbody>${prows}</tbody></table>`));
+  }
   wrap.appendChild(card(`<table class="results-table">
     <thead><tr><th>#</th><th>Jugador</th><th>Hcp.</th><th>Hcp. campo</th><th>Golpes</th><th>Resultado</th></tr></thead>
     <tbody>${rows}</tbody></table>`));
@@ -2062,16 +3053,17 @@ window.addEventListener('storage', (e)=>{
   }
 });
 window.addEventListener('golf-local-update', ()=>{ /* ya se renderiza tras cada acción local */ });
+/* respaldo por si Realtime no llega (red inestable, canal caído): refresco cada 20s */
 setInterval(()=>{
   if ((CURRENT.screen==='play' || CURRENT.screen==='spectate') && CURRENT.code){
     const cached = Store.getMatch(CURRENT.code);
     if (cached && cached._airtableId){
-      pullAndMerge(CURRENT.code).then(()=> render()).catch(err=>console.error('Airtable poll:',err));
+      pullAndMerge(CURRENT.code).then(()=> render()).catch(err=>console.error('Refresco:',err));
     } else {
       render();
     }
   }
-}, 6000);
+}, 20000);
 
 /* ---------------- semilla de datos de ejemplo: partida 2012 (cerrada) ---------------- */
 function seedDemoMatch(){
