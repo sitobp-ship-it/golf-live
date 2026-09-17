@@ -175,17 +175,18 @@ input.code-input{text-align:center;letter-spacing:10px;font-size:26px;font-famil
 
 /* hoyo | golpes lado a lado, ambos grandes (pensado para verse bien de lejos),
    con un marco dorado suave y redondeado que enmarca las dos columnas juntas */
-.score-side{display:flex;gap:10px;align-items:flex-start;justify-content:center;
-  border:1.5px solid rgba(201,162,75,.45);border-radius:22px;padding:16px 10px;
+.score-side{display:flex;gap:0;align-items:stretch;justify-content:center;
+  border:1.5px solid rgba(201,162,75,.45);border-radius:22px;padding:16px 6px;
   background:rgba(201,162,75,.06);}
-.score-side .col{flex:1;min-width:0;}
-.score-side .col-label{font-family:'Bebas Neue';font-size:13px;letter-spacing:1.5px;color:#ffffff;margin-bottom:2px;}
-.score-side .big-num{font-family:'Bebas Neue';font-size:108px;line-height:1;color:#ffffff;}
+.score-side .col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;}
+.score-side .col:first-child{border-right:1.5px solid rgba(201,162,75,.4);}
+.score-side .col-label{font-family:'Bebas Neue';font-size:20px;letter-spacing:1.5px;color:#ffffff;margin-bottom:2px;}
+.score-side .big-num{font-family:'Bebas Neue';font-size:108px;line-height:108px;height:108px;color:#ffffff;}
 .strokes-input-wrap{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;}
 .stepper-btn{width:48px;height:48px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--gris-linea);color:var(--crema);font-size:24px;cursor:pointer;}
-.strokes-display{font-family:'Bebas Neue';font-size:108px;line-height:1;width:150px;text-align:center;background:transparent;border:none;color:#ffffff;padding:0;-moz-appearance:textfield;}
-.strokes-display::-webkit-outer-spin-button,.strokes-display::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
-@media (max-width:380px){ .strokes-display{font-size:80px;width:110px;} .score-side .big-num{font-size:80px;} }
+input.strokes-display{font-family:'Bebas Neue';font-size:108px;line-height:108px;height:108px;width:150px;text-align:center;background:transparent;border:none;color:#ffffff;padding:0;margin:0;box-sizing:content-box;-moz-appearance:textfield;}
+input.strokes-display::-webkit-outer-spin-button,input.strokes-display::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+@media (max-width:380px){ input.strokes-display{font-size:74px;line-height:74px;height:74px;width:105px;} .score-side .big-num{font-size:74px;line-height:74px;height:74px;} .score-side .col-label{font-size:16px;} }
 
 /* mensaje de resultado (par / birdie / bogey...) */
 .result-msg{font-size:14.5px;font-weight:700;margin:4px 0 14px;padding:10px 14px;border-radius:12px;min-height:18px;}
@@ -2463,7 +2464,7 @@ function drawGolfBallIcon(doc, cx, cy, r){
    en tema claro para que se lea bien impreso a página completa */
 function renderEvolutionChartPNG(match){
   const canvas = document.createElement('canvas');
-  const W = 1400, H = 1980;
+  const W = 1980, H = 1400;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
@@ -2507,49 +2508,49 @@ async function buildReportPDF(match, ranked, comentarios){
     avatarByPlayerId[row.p.id] = await imageUrlToDataURL(row.p.avatar);
   }));
 
-  const HEADER_H = 86;
+  const HEADER_H = 66;
   function header(){
     doc.setFillColor(...verdeOscuro);
     doc.rect(0,0,pageW,HEADER_H,'F');
     doc.setFillColor(...dorado);
     doc.rect(0,HEADER_H,pageW,1.4,'F');
     doc.setTextColor(...dorado);
-    doc.setFont('helvetica','bold'); doc.setFontSize(22);
-    doc.text('GOLF LIVE', 14, 17);
+    doc.setFont('helvetica','bold'); doc.setFontSize(20);
+    doc.text('GOLF LIVE', 14, 15);
     doc.setTextColor(...crema);
-    doc.setFont('helvetica','normal'); doc.setFontSize(11);
-    doc.text('Informe de partida', 14, 25);
-    doc.setFontSize(9);
-    doc.text(`${match.campoNombre}   ·   ${new Date(match.createdAt).toLocaleDateString('es-ES')}   ·   Código ${match.code}`, 14, 32);
-    drawGolfBallIcon(doc, pageW-18, 16, 8);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text('Informe de partida', 14, 22);
+    doc.setFontSize(8.5);
+    doc.text(`${match.campoNombre}   ·   ${new Date(match.createdAt).toLocaleDateString('es-ES')}   ·   Código ${match.code}`, 14, 28);
+    drawGolfBallIcon(doc, pageW-16, 14, 7);
 
     // podio con los 3 primeros (avatar, nombre y resultado)
     const podio = [ranked[1], ranked[0], ranked[2]];
     const cx0 = pageW/2;
-    const offsets = [-34, 0, 34];
-    const radii = [9, 12, 9];
+    const offsets = [-30, 0, 30];
+    const radii = [7, 9, 7];
     const rings = [plata, oro, bronce];
-    const cy = 52;
-    const maxR = 12;
+    const cy = 42;
+    const maxR = 9;
     podio.forEach((row,i)=>{
       if (!row) return;
       const cx = cx0 + offsets[i];
       const r = radii[i];
       drawAvatarChip(doc, cx, cy, r, avatarByPlayerId[row.p.id], row.p.name, rings[i]);
       doc.setTextColor(...crema);
-      doc.setFont('helvetica','bold'); doc.setFontSize(9);
-      doc.text(row.p.name, cx, cy+maxR+7, {align:'center', maxWidth:44});
+      doc.setFont('helvetica','bold'); doc.setFontSize(8);
+      doc.text(row.p.name, cx, cy+maxR+6, {align:'center', maxWidth:40});
       const diffColor = row.diff===0 ? dorado : (row.diff>0 ? [255,138,128] : [127,227,163]);
       doc.setTextColor(...diffColor);
-      doc.setFontSize(9.5);
-      doc.text(fmtDiff(row.diff), cx, cy+maxR+13, {align:'center'});
+      doc.setFontSize(8.5);
+      doc.text(fmtDiff(row.diff), cx, cy+maxR+11, {align:'center'});
     });
     doc.setTextColor(20,20,20);
   }
   header();
-  let y = HEADER_H + 12;
+  let y = HEADER_H + 8;
 
-  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
   doc.text('Clasificación final', 14, y);
   y += 4;
   doc.autoTable({
@@ -2559,10 +2560,10 @@ async function buildReportPDF(match, ranked, comentarios){
       '', idx+1, row.p.name + (row.p.isMaster?' (master)':''), row.p.hcp, row.p.hcpCampo, row.extra.strokes, fmtDiff(row.diff)
     ]),
     theme: 'grid',
-    headStyles: { fillColor: verdeCampo, textColor: [255,255,255], fontStyle:'bold' },
+    headStyles: { fillColor: verdeCampo, textColor: [255,255,255], fontStyle:'bold', fontSize:8.5 },
     alternateRowStyles: { fillColor: [227,242,232] },
-    styles: { fontSize: 9.5, cellPadding: 3.2, minCellHeight: 11, lineColor:[210,220,213], lineWidth:0.2 },
-    columnStyles: { 0: { cellWidth: 13 } },
+    styles: { fontSize: 8.5, cellPadding: 2, minCellHeight: 8, lineColor:[210,220,213], lineWidth:0.2 },
+    columnStyles: { 0: { cellWidth: 11 } },
     margin: { left:14, right:14 },
     didDrawCell: (data)=>{
       if (data.section==='body' && data.column.index===0){
@@ -2575,10 +2576,10 @@ async function buildReportPDF(match, ranked, comentarios){
       }
     }
   });
-  y = doc.lastAutoTable.finalY + 12;
+  y = doc.lastAutoTable.finalY + 6;
 
-  if (y > 250){ doc.addPage(); y = 20; }
-  doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  if (y > 270){ doc.addPage(); y = 20; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
   doc.text('Golpes por hoyo', 14, y);
   y += 4;
 
@@ -2594,9 +2595,9 @@ async function buildReportPDF(match, ranked, comentarios){
     head: [holeHead],
     body: [parTotalRow, ...bodyRows],
     theme: 'grid',
-    headStyles: { fillColor: [231,222,196], textColor:[20,20,20], fontSize:7, halign:'center', fontStyle:'bold' },
-    styles: { fontSize:7, cellPadding:1.6, halign:'center', textColor:[30,30,30] },
-    columnStyles: { 0: { halign:'left', fontStyle:'bold', cellWidth: 26 } },
+    headStyles: { fillColor: [231,222,196], textColor:[20,20,20], fontSize:6.3, halign:'center', fontStyle:'bold' },
+    styles: { fontSize:6.3, cellPadding:1.1, halign:'center', textColor:[30,30,30] },
+    columnStyles: { 0: { halign:'left', fontStyle:'bold', cellWidth: 24 } },
     margin: { left:14, right:14 },
     didParseCell: (data)=>{
       if (data.section!=='body') return;
@@ -2612,33 +2613,36 @@ async function buildReportPDF(match, ranked, comentarios){
       }
     }
   });
-  y = doc.lastAutoTable.finalY + 12;
+  y = doc.lastAutoTable.finalY + 10;
 
   if (comentarios && comentarios.trim()){
-    if (y > 250){ doc.addPage(); y = 20; }
-    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20,20,20);
+    if (y > 265){ doc.addPage(); y = 20; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(20,20,20);
     doc.text('Comentarios', 14, y); y += 6;
-    doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
     doc.text(doc.splitTextToSize(comentarios, pageW-28), 14, y);
   }
 
-  // pagina dedicada, a toda hoja, a la evolucion del ranking por hoyo
-  doc.addPage();
+  // pagina 2 dedicada, en horizontal, a la evolucion del ranking por hoyo
+  doc.addPage('a4', 'landscape');
+  const pageW2 = doc.internal.pageSize.getWidth();
+  const pageH2 = doc.internal.pageSize.getHeight();
   doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20,20,20);
-  doc.text('Evolución del ranking por hoyo', 14, 18);
+  doc.text('Evolución del ranking por hoyo', 14, 16);
   const evoImg = renderEvolutionChartPNG(match);
-  const maxW = pageW-28, maxH = pageH-40;
-  const ratio = 1400/1980;
+  const maxW = pageW2-24, maxH = pageH2-28;
+  const ratio = 1980/1400;
   let imgW = maxW, imgH = imgW/ratio;
   if (imgH > maxH){ imgH = maxH; imgW = imgH*ratio; }
-  doc.addImage(evoImg, 'JPEG', (pageW-imgW)/2, 26, imgW, imgH);
+  doc.addImage(evoImg, 'JPEG', (pageW2-imgW)/2, 22, imgW, imgH);
 
   const pageCount = doc.internal.getNumberOfPages();
   for (let i=1;i<=pageCount;i++){
     doc.setPage(i);
+    const w = doc.internal.pageSize.getWidth(), h = doc.internal.pageSize.getHeight();
     doc.setFontSize(8); doc.setTextColor(140,140,140);
-    doc.text('Golf Live · Marcador en tiempo real', 14, pageH-8);
-    doc.text(`Página ${i} de ${pageCount}`, pageW-14, pageH-8, {align:'right'});
+    doc.text('Golf Live · Marcador en tiempo real', 14, h-8);
+    doc.text(`Página ${i} de ${pageCount}`, w-14, h-8, {align:'right'});
   }
   return doc;
 }
