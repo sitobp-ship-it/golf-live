@@ -173,15 +173,19 @@ input.code-input{text-align:center;letter-spacing:10px;font-size:26px;font-famil
 .hole-par{color:var(--dorado-claro);font-size:16px;margin:10px 0 16px;font-weight:700;}
 .close-master{margin-top:18px;padding-top:16px;border-top:1px dashed var(--gris-linea);}
 
-/* hoyo | golpes lado a lado, ambos grandes (pensado para verse bien de lejos) */
-.score-side{display:flex;gap:10px;align-items:flex-start;justify-content:center;}
+/* hoyo | golpes lado a lado, ambos grandes (pensado para verse bien de lejos),
+   con un marco dorado suave y redondeado que enmarca las dos columnas juntas */
+.score-side{display:flex;gap:10px;align-items:flex-start;justify-content:center;
+  border:1.5px solid rgba(201,162,75,.45);border-radius:22px;padding:16px 10px;
+  background:rgba(201,162,75,.06);}
 .score-side .col{flex:1;min-width:0;}
-.score-side .col-label{font-family:'Bebas Neue';font-size:13px;letter-spacing:1.5px;color:rgba(243,239,226,.5);margin-bottom:2px;}
-.score-side .big-num{font-family:'Bebas Neue';font-size:88px;line-height:1;color:var(--crema);}
+.score-side .col-label{font-family:'Bebas Neue';font-size:13px;letter-spacing:1.5px;color:#ffffff;margin-bottom:2px;}
+.score-side .big-num{font-family:'Bebas Neue';font-size:108px;line-height:1;color:#ffffff;}
 .strokes-input-wrap{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;}
 .stepper-btn{width:48px;height:48px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--gris-linea);color:var(--crema);font-size:24px;cursor:pointer;}
-.strokes-display{font-family:'Bebas Neue';font-size:150px;width:150px;text-align:center;background:transparent;border:none;color:var(--crema);}
-@media (max-width:380px){ .strokes-display{font-size:120px;width:120px;} .score-side .big-num{font-size:72px;} }
+.strokes-display{font-family:'Bebas Neue';font-size:108px;line-height:1;width:150px;text-align:center;background:transparent;border:none;color:#ffffff;padding:0;-moz-appearance:textfield;}
+.strokes-display::-webkit-outer-spin-button,.strokes-display::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+@media (max-width:380px){ .strokes-display{font-size:80px;width:110px;} .score-side .big-num{font-size:80px;} }
 
 /* mensaje de resultado (par / birdie / bogey...) */
 .result-msg{font-size:14.5px;font-weight:700;margin:4px 0 14px;padding:10px 14px;border-radius:12px;min-height:18px;}
@@ -2402,18 +2406,113 @@ let resultsTab = 'clasificacion';
 const compareSelection = new Set();
 
 /* ---- generación del informe PDF ---- */
-function buildReportPDF(match, ranked, comentarios){
+/* descarga una imagen (avatar) y la convierte a data URL para poder incrustarla en el PDF;
+   null si falla (CORS, sin avatar, etc.) — el dibujo de avatar cae entonces a las iniciales */
+async function imageUrlToDataURL(url){
+  if (!url) return null;
+  try{
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve,reject)=>{
+      const r = new FileReader();
+      r.onload = ()=>resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  } catch(e){ return null; }
+}
+function detectImgFormat(dataUrl){
+  if (!dataUrl) return 'PNG';
+  if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+  if (dataUrl.startsWith('data:image/webp')) return 'WEBP';
+  return 'PNG';
+}
+/* dibuja un avatar circular (con recorte si el motor de jsPDF lo permite) o, si no hay foto,
+   un círculo de color con las iniciales del jugador */
+function drawAvatarChip(doc, cx, cy, r, dataUrl, name, ringColor){
+  if (dataUrl){
+    try{
+      doc.saveGraphicsState();
+      doc.circle(cx, cy, r-0.4, null);
+      doc.clip();
+      doc.discardPath();
+      doc.addImage(dataUrl, detectImgFormat(dataUrl), cx-r, cy-r, r*2, r*2);
+      doc.restoreGraphicsState();
+      doc.setDrawColor(...ringColor); doc.setLineWidth(0.9);
+      doc.circle(cx, cy, r, 'S');
+      return;
+    } catch(e){ /* cae a iniciales */ }
+  }
+  doc.setFillColor(...ringColor);
+  doc.circle(cx, cy, r, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(Math.max(7, r*2.1));
+  doc.text(initials(name||'?'), cx, cy + r*0.35, {align:'center'});
+}
+/* pequeña pelota de golf dibujada a mano (sin depender de ninguna imagen externa) */
+function drawGolfBallIcon(doc, cx, cy, r){
+  doc.setFillColor(255,255,255);
+  doc.setDrawColor(201,162,75); doc.setLineWidth(0.6);
+  doc.circle(cx, cy, r, 'FD');
+  doc.setFillColor(180,180,180);
+  const dimples = [[-0.4,-0.3],[0.3,-0.4],[0,0],[-0.3,0.4],[0.4,0.3],[-0.1,-0.6],[0.5,0]];
+  dimples.forEach(([dx,dy])=> doc.circle(cx+dx*r, cy+dy*r, r*0.11, 'F'));
+}
+/* renderiza (fuera de pantalla) el gráfico de evolución del ranking por hoyo como PNG,
+   en tema claro para que se lea bien impreso a página completa */
+function renderEvolutionChartPNG(match){
+  const canvas = document.createElement('canvas');
+  const W = 1400, H = 1980;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,W,H);
+  const posSeries = positionsPerHole(match);
+  const palette = ['#b8863c','#2f8f5b','#c0392b','#2f7fc1','#9b59b6','#c98a12','#16a085','#d6336c'];
+  const labels = Array.from({length:match.holes}, (_,i)=>'H'+(i+1));
+  const datasets = match.players.map((p,idx)=>{
+    const series = posSeries[p.id];
+    const dataMap = {}; series.forEach(s=> dataMap[s.hole]=s.pos);
+    return { label:p.name, data: labels.map((_,i)=> dataMap[i+1] ?? null), borderColor: palette[idx%palette.length],
+      backgroundColor:'transparent', spanGaps:true, tension:.3, pointRadius:5, borderWidth:3 };
+  });
+  const whiteBgPlugin = { id:'whiteBg', beforeDraw:(c)=>{ c.ctx.save(); c.ctx.fillStyle='#ffffff'; c.ctx.fillRect(0,0,c.width,c.height); c.ctx.restore(); } };
+  const chart = new Chart(ctx, {
+    type:'line', data:{ labels, datasets },
+    plugins:[whiteBgPlugin],
+    options:{
+      responsive:false, animation:false, devicePixelRatio:1,
+      scales:{
+        y:{ reverse:true, ticks:{stepSize:1, color:'#222', font:{size:22}}, grid:{color:'#e8e8e8'} },
+        x:{ ticks:{color:'#222', font:{size:18}}, grid:{color:'#f2f2f2'} }
+      },
+      plugins:{ legend:{ position:'bottom', labels:{color:'#222', boxWidth:22, font:{size:20}} } }
+    }
+  });
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  chart.destroy();
+  return dataUrl;
+}
+
+async function buildReportPDF(match, ranked, comentarios){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const verdeOscuro = [13,58,38], verdeCampo = [21,92,57], dorado = [201,162,75], crema = [243,239,226];
+  const oro=[201,162,75], plata=[176,176,180], bronce=[176,124,77];
 
+  const avatarByPlayerId = {};
+  await Promise.all(ranked.map(async row=>{
+    avatarByPlayerId[row.p.id] = await imageUrlToDataURL(row.p.avatar);
+  }));
+
+  const HEADER_H = 86;
   function header(){
     doc.setFillColor(...verdeOscuro);
-    doc.rect(0,0,pageW,38,'F');
+    doc.rect(0,0,pageW,HEADER_H,'F');
     doc.setFillColor(...dorado);
-    doc.rect(0,38,pageW,1.4,'F');
+    doc.rect(0,HEADER_H,pageW,1.4,'F');
     doc.setTextColor(...dorado);
     doc.setFont('helvetica','bold'); doc.setFontSize(22);
     doc.text('GOLF LIVE', 14, 17);
@@ -2422,25 +2521,59 @@ function buildReportPDF(match, ranked, comentarios){
     doc.text('Informe de partida', 14, 25);
     doc.setFontSize(9);
     doc.text(`${match.campoNombre}   ·   ${new Date(match.createdAt).toLocaleDateString('es-ES')}   ·   Código ${match.code}`, 14, 32);
+    drawGolfBallIcon(doc, pageW-18, 16, 8);
+
+    // podio con los 3 primeros (avatar, nombre y resultado)
+    const podio = [ranked[1], ranked[0], ranked[2]];
+    const cx0 = pageW/2;
+    const offsets = [-34, 0, 34];
+    const radii = [9, 12, 9];
+    const rings = [plata, oro, bronce];
+    const cy = 52;
+    const maxR = 12;
+    podio.forEach((row,i)=>{
+      if (!row) return;
+      const cx = cx0 + offsets[i];
+      const r = radii[i];
+      drawAvatarChip(doc, cx, cy, r, avatarByPlayerId[row.p.id], row.p.name, rings[i]);
+      doc.setTextColor(...crema);
+      doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.text(row.p.name, cx, cy+maxR+7, {align:'center', maxWidth:44});
+      const diffColor = row.diff===0 ? dorado : (row.diff>0 ? [255,138,128] : [127,227,163]);
+      doc.setTextColor(...diffColor);
+      doc.setFontSize(9.5);
+      doc.text(fmtDiff(row.diff), cx, cy+maxR+13, {align:'center'});
+    });
     doc.setTextColor(20,20,20);
   }
   header();
-  let y = 50;
+  let y = HEADER_H + 12;
 
   doc.setFont('helvetica','bold'); doc.setFontSize(14);
   doc.text('Clasificación final', 14, y);
   y += 4;
   doc.autoTable({
     startY: y,
-    head: [['#','Jugador','Hcp.','Hcp. campo','Golpes','Resultado']],
+    head: [['','#','Jugador','Hcp.','Hcp. campo','Golpes','Resultado']],
     body: ranked.map((row,idx)=>[
-      idx+1, row.p.name + (row.p.isMaster?' (master)':''), row.p.hcp, row.p.hcpCampo, row.extra.strokes, fmtDiff(row.diff)
+      '', idx+1, row.p.name + (row.p.isMaster?' (master)':''), row.p.hcp, row.p.hcpCampo, row.extra.strokes, fmtDiff(row.diff)
     ]),
-    theme: 'striped',
+    theme: 'grid',
     headStyles: { fillColor: verdeCampo, textColor: [255,255,255], fontStyle:'bold' },
-    alternateRowStyles: { fillColor: [237,243,238] },
-    styles: { fontSize: 9.5, cellPadding: 3.2 },
-    margin: { left:14, right:14 }
+    alternateRowStyles: { fillColor: [227,242,232] },
+    styles: { fontSize: 9.5, cellPadding: 3.2, minCellHeight: 11, lineColor:[210,220,213], lineWidth:0.2 },
+    columnStyles: { 0: { cellWidth: 13 } },
+    margin: { left:14, right:14 },
+    didDrawCell: (data)=>{
+      if (data.section==='body' && data.column.index===0){
+        const row = ranked[data.row.index];
+        const cx = data.cell.x + data.cell.width/2;
+        const cy = data.cell.y + data.cell.height/2;
+        const r = Math.min(data.cell.width, data.cell.height)/2 - 1;
+        const ring = data.row.index===0?oro:(data.row.index===1?plata:(data.row.index===2?bronce:verdeCampo));
+        drawAvatarChip(doc, cx, cy, r, avatarByPlayerId[row.p.id], row.p.name, ring);
+      }
+    }
   });
   y = doc.lastAutoTable.finalY + 12;
 
@@ -2461,12 +2594,22 @@ function buildReportPDF(match, ranked, comentarios){
     head: [holeHead],
     body: [parTotalRow, ...bodyRows],
     theme: 'grid',
-    headStyles: { fillColor: verdeCampo, textColor:[255,255,255], fontSize:7, halign:'center' },
+    headStyles: { fillColor: [231,222,196], textColor:[20,20,20], fontSize:7, halign:'center', fontStyle:'bold' },
     styles: { fontSize:7, cellPadding:1.6, halign:'center', textColor:[30,30,30] },
     columnStyles: { 0: { halign:'left', fontStyle:'bold', cellWidth: 26 } },
     margin: { left:14, right:14 },
     didParseCell: (data)=>{
-      if (data.row.index===0){ data.cell.styles.fillColor = [231,222,196]; data.cell.styles.fontStyle='bold'; }
+      if (data.section!=='body') return;
+      if (data.row.index===0){ data.cell.styles.fillColor = [231,222,196]; data.cell.styles.fontStyle='bold'; return; }
+      const colIdx = data.column.index;
+      if (colIdx>=1 && colIdx<=match.holes){
+        const val = parseInt(data.cell.raw);
+        const par = pares[colIdx-1];
+        if (!isNaN(val)){
+          if (val<par) data.cell.styles.textColor = [39,127,77];
+          else if (val>par) data.cell.styles.textColor = [176,42,30];
+        }
+      }
     }
   });
   y = doc.lastAutoTable.finalY + 12;
@@ -2478,6 +2621,17 @@ function buildReportPDF(match, ranked, comentarios){
     doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
     doc.text(doc.splitTextToSize(comentarios, pageW-28), 14, y);
   }
+
+  // pagina dedicada, a toda hoja, a la evolucion del ranking por hoyo
+  doc.addPage();
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20,20,20);
+  doc.text('Evolución del ranking por hoyo', 14, 18);
+  const evoImg = renderEvolutionChartPNG(match);
+  const maxW = pageW-28, maxH = pageH-40;
+  const ratio = 1400/1980;
+  let imgW = maxW, imgH = imgW/ratio;
+  if (imgH > maxH){ imgH = maxH; imgW = imgH*ratio; }
+  doc.addImage(evoImg, 'JPEG', (pageW-imgW)/2, 26, imgW, imgH);
 
   const pageCount = doc.internal.getNumberOfPages();
   for (let i=1;i<=pageCount;i++){
@@ -2567,12 +2721,19 @@ function ScreenResults(){
     const msgs = chatCache[match.code] || [];
     return msgs.map(m=>`${m.nombre}: ${m.texto}`).join('\n');
   }
-  top.querySelector('#btnInforme').onclick = ()=>{
-    const doc = buildReportPDF(match, ranked, chatAsText());
-    window.open(doc.output('bloburl'), '_blank');
+  top.querySelector('#btnInforme').onclick = async ()=>{
+    const btn = top.querySelector('#btnInforme');
+    const original = btn.textContent; btn.textContent = 'Generando…'; btn.disabled = true;
+    try {
+      const doc = await buildReportPDF(match, ranked, chatAsText());
+      window.open(doc.output('bloburl'), '_blank');
+    } finally { btn.textContent = original; btn.disabled = false; }
   };
   top.querySelector('#btnWhatsappPDF').onclick = async ()=>{
-    const doc = buildReportPDF(match, ranked, chatAsText());
+    const btn = top.querySelector('#btnWhatsappPDF');
+    const original = btn.textContent; btn.textContent = 'Generando…'; btn.disabled = true;
+    const doc = await buildReportPDF(match, ranked, chatAsText());
+    btn.textContent = original; btn.disabled = false;
     const blob = doc.output('blob');
     const file = new File([blob], `golf-live-${match.code}.pdf`, {type:'application/pdf'});
     if (navigator.canShare && navigator.canShare({files:[file]})){
